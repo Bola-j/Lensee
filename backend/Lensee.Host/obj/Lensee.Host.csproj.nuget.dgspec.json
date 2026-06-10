@@ -31,8 +31,37 @@
         },
         "frameworks": {
           "net8.0": {
+            "framework": "net8.0",
             "targetAlias": "net8.0",
-            "projectReferences": {}
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.Modules.Catalog\\Lensee.Modules.Catalog.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Catalog\\Lensee.Modules.Catalog.csproj"
+              },
+              "D:\\Lensee\\backend\\Lensee.Modules.CRM\\Lensee.Modules.CRM.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.CRM\\Lensee.Modules.CRM.csproj"
+              },
+              "D:\\Lensee\\backend\\Lensee.Modules.Identity\\Lensee.Modules.Identity.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Identity\\Lensee.Modules.Identity.csproj"
+              },
+              "D:\\Lensee\\backend\\Lensee.Modules.Inventory\\Lensee.Modules.Inventory.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Inventory\\Lensee.Modules.Inventory.csproj"
+              },
+              "D:\\Lensee\\backend\\Lensee.Modules.Notifications\\Lensee.Modules.Notifications.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Notifications\\Lensee.Modules.Notifications.csproj"
+              },
+              "D:\\Lensee\\backend\\Lensee.Modules.Operations\\Lensee.Modules.Operations.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Operations\\Lensee.Modules.Operations.csproj"
+              },
+              "D:\\Lensee\\backend\\Lensee.Modules.Payments\\Lensee.Modules.Payments.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Payments\\Lensee.Modules.Payments.csproj"
+              },
+              "D:\\Lensee\\backend\\Lensee.Modules.Reporting\\Lensee.Modules.Reporting.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Reporting\\Lensee.Modules.Reporting.csproj"
+              },
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
           }
         },
         "warningProperties": {
@@ -49,6 +78,7 @@
       },
       "frameworks": {
         "net8.0": {
+          "framework": "net8.0",
           "targetAlias": "net8.0",
           "dependencies": {
             "Microsoft.AspNetCore.OpenApi": {
@@ -75,6 +105,650 @@
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
             },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.Modules.Catalog\\Lensee.Modules.Catalog.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.Modules.Catalog\\Lensee.Modules.Catalog.csproj",
+        "projectName": "Lensee.Modules.Catalog",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Catalog\\Lensee.Modules.Catalog.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.Modules.Catalog\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.Modules.CRM\\Lensee.Modules.CRM.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.Modules.CRM\\Lensee.Modules.CRM.csproj",
+        "projectName": "Lensee.Modules.CRM",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.CRM\\Lensee.Modules.CRM.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.Modules.CRM\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.Modules.Identity\\Lensee.Modules.Identity.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.Modules.Identity\\Lensee.Modules.Identity.csproj",
+        "projectName": "Lensee.Modules.Identity",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Identity\\Lensee.Modules.Identity.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.Modules.Identity\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.Modules.Inventory\\Lensee.Modules.Inventory.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.Modules.Inventory\\Lensee.Modules.Inventory.csproj",
+        "projectName": "Lensee.Modules.Inventory",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Inventory\\Lensee.Modules.Inventory.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.Modules.Inventory\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.Modules.Notifications\\Lensee.Modules.Notifications.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.Modules.Notifications\\Lensee.Modules.Notifications.csproj",
+        "projectName": "Lensee.Modules.Notifications",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Notifications\\Lensee.Modules.Notifications.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.Modules.Notifications\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.Modules.Operations\\Lensee.Modules.Operations.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.Modules.Operations\\Lensee.Modules.Operations.csproj",
+        "projectName": "Lensee.Modules.Operations",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Operations\\Lensee.Modules.Operations.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.Modules.Operations\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.Modules.Payments\\Lensee.Modules.Payments.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.Modules.Payments\\Lensee.Modules.Payments.csproj",
+        "projectName": "Lensee.Modules.Payments",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Payments\\Lensee.Modules.Payments.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.Modules.Payments\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.Modules.Reporting\\Lensee.Modules.Reporting.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.Modules.Reporting\\Lensee.Modules.Reporting.csproj",
+        "projectName": "Lensee.Modules.Reporting",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.Modules.Reporting\\Lensee.Modules.Reporting.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.Modules.Reporting\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+                "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj",
+        "projectName": "Lensee.SharedKernel",
+        "projectPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\Lensee.SharedKernel.csproj",
+        "packagesPath": "C:\\Users\\Bola_Gerges\\.nuget\\packages\\",
+        "outputPath": "D:\\Lensee\\backend\\Lensee.SharedKernel\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Bola_Gerges\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
