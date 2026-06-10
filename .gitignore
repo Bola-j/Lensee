@@ -14,3 +14,6 @@ obj/
 # User files
 *.user
 *.suo
+./backend/Lensee.Host/appsettings.Development.json
+./backend/Lensee.Host/appsettings.json
+./backend/Lensee.Host/appsettings.Development.json

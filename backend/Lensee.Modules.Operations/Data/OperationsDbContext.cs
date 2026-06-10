@@ -1,0 +1,252 @@
+﻿using System;
+using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+
+namespace Lensee.Modules.Operations.Data;
+
+public partial class OperationsDbContext : DbContext
+{
+    public OperationsDbContext(DbContextOptions<OperationsDbContext> options)
+        : base(options)
+    {
+    }
+
+    public virtual DbSet<OperationLine> OperationLines { get; set; }
+
+    public virtual DbSet<OperationLog> OperationLogs { get; set; }
+
+    public virtual DbSet<OperationVersion> OperationVersions { get; set; }
+
+    public virtual DbSet<StocktakeAdjustmentLine> StocktakeAdjustmentLines { get; set; }
+
+    public virtual DbSet<StocktakeSession> StocktakeSessions { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasPostgresExtension("uuid-ossp");
+
+        modelBuilder.Entity<OperationLine>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("operation_lines_pkey");
+
+            entity.ToTable("operation_lines", "operations");
+
+            entity.HasIndex(e => e.OperationId, "idx_op_lines_operation");
+
+            entity.HasIndex(e => e.SkuId, "idx_op_lines_sku");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("uuid_generate_v4()")
+                .HasColumnName("id");
+            entity.Property(e => e.BonusQuantity)
+                .HasDefaultValue(0)
+                .HasColumnName("bonus_quantity");
+            entity.Property(e => e.EntryMode)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("'Pieces'::character varying")
+                .HasColumnName("entry_mode");
+            entity.Property(e => e.ExpiryDate).HasColumnName("expiry_date");
+            entity.Property(e => e.LineNotes).HasColumnName("line_notes");
+            entity.Property(e => e.LineTotal)
+                .HasPrecision(18, 4)
+                .HasColumnName("line_total");
+            entity.Property(e => e.LotNumber)
+                .HasMaxLength(100)
+                .HasColumnName("lot_number");
+            entity.Property(e => e.MerchantNameSnapshot)
+                .HasMaxLength(255)
+                .HasColumnName("merchant_name_snapshot");
+            entity.Property(e => e.OperationId).HasColumnName("operation_id");
+            entity.Property(e => e.ProductNameSnapshot)
+                .HasMaxLength(255)
+                .HasColumnName("product_name_snapshot");
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.RepresentativeNameSnapshot)
+                .HasMaxLength(255)
+                .HasColumnName("representative_name_snapshot");
+            entity.Property(e => e.Section)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'Standard'::character varying")
+                .HasColumnName("section");
+            entity.Property(e => e.SkuCodeSnapshot)
+                .HasMaxLength(100)
+                .HasColumnName("sku_code_snapshot");
+            entity.Property(e => e.SkuId).HasColumnName("sku_id");
+            entity.Property(e => e.UnitCost)
+                .HasPrecision(18, 4)
+                .HasColumnName("unit_cost");
+            entity.Property(e => e.UnitPrice)
+                .HasPrecision(18, 4)
+                .HasColumnName("unit_price");
+            entity.Property(e => e.WriteOffReason)
+                .HasMaxLength(50)
+                .HasColumnName("write_off_reason");
+            entity.Property(e => e.WriteOffReasonText).HasColumnName("write_off_reason_text");
+
+            entity.HasOne(d => d.Operation).WithMany(p => p.OperationLines)
+                .HasForeignKey(d => d.OperationId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("operation_lines_operation_id_fkey");
+        });
+
+        modelBuilder.Entity<OperationLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("operation_logs_pkey");
+
+            entity.ToTable("operation_logs", "operations");
+
+            entity.HasIndex(e => e.ClientId, "idx_op_logs_client").HasFilter("(client_id IS NOT NULL)");
+
+            entity.HasIndex(e => e.CreatedAt, "idx_op_logs_created_at").IsDescending();
+
+            entity.HasIndex(e => e.CreatedBy, "idx_op_logs_created_by");
+
+            entity.HasIndex(e => e.SourceLocationId, "idx_op_logs_source_location");
+
+            entity.HasIndex(e => new { e.OperationType, e.Status }, "idx_op_logs_type_status");
+
+            entity.HasIndex(e => e.OperationNumber, "operation_logs_operation_number_key").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("uuid_generate_v4()")
+                .HasColumnName("id");
+            entity.Property(e => e.ClientId).HasColumnName("client_id");
+            entity.Property(e => e.ClientName)
+                .HasMaxLength(255)
+                .HasColumnName("client_name");
+            entity.Property(e => e.ConfirmedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("confirmed_at");
+            entity.Property(e => e.ConfirmedBy).HasColumnName("confirmed_by");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.CurrentVersionId).HasColumnName("current_version_id");
+            entity.Property(e => e.DeletedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("deleted_at");
+            entity.Property(e => e.DestinationLocationId).HasColumnName("destination_location_id");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValue(false)
+                .HasColumnName("is_deleted");
+            entity.Property(e => e.Notes).HasColumnName("notes");
+            entity.Property(e => e.OperationNumber)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('OP-'::text || to_char(nextval('operations.operation_number_seq'::regclass), 'FM000000'::text))")
+                .HasColumnName("operation_number");
+            entity.Property(e => e.OperationType)
+                .HasMaxLength(50)
+                .HasColumnName("operation_type");
+            entity.Property(e => e.PaymentMethod)
+                .HasMaxLength(50)
+                .HasColumnName("payment_method");
+            entity.Property(e => e.RepresentativeId).HasColumnName("representative_id");
+            entity.Property(e => e.SourceLocationId).HasColumnName("source_location_id");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("'Draft'::character varying")
+                .HasColumnName("status");
+
+            entity.HasOne(d => d.CurrentVersion).WithMany(p => p.OperationLogs)
+                .HasForeignKey(d => d.CurrentVersionId)
+                .HasConstraintName("fk_current_version");
+        });
+
+        modelBuilder.Entity<OperationVersion>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("operation_versions_pkey");
+
+            entity.ToTable("operation_versions", "operations");
+
+            entity.HasIndex(e => e.OperationId, "idx_op_versions_operation");
+
+            entity.HasIndex(e => new { e.OperationId, e.VersionNumber }, "uq_op_version").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("uuid_generate_v4()")
+                .HasColumnName("id");
+            entity.Property(e => e.EditedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("edited_at");
+            entity.Property(e => e.EditedBy).HasColumnName("edited_by");
+            entity.Property(e => e.OperationId).HasColumnName("operation_id");
+            entity.Property(e => e.Reason)
+                .HasDefaultValueSql("'Initial'::text")
+                .HasColumnName("reason");
+            entity.Property(e => e.SnapshotData)
+                .HasColumnType("jsonb")
+                .HasColumnName("snapshot_data");
+            entity.Property(e => e.VersionNumber).HasColumnName("version_number");
+
+            entity.HasOne(d => d.Operation).WithMany(p => p.OperationVersions)
+                .HasForeignKey(d => d.OperationId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("operation_versions_operation_id_fkey");
+        });
+
+        modelBuilder.Entity<StocktakeAdjustmentLine>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("stocktake_adjustment_lines_pkey");
+
+            entity.ToTable("stocktake_adjustment_lines", "operations");
+
+            entity.HasIndex(e => e.SessionId, "idx_stocktake_adj_session");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("uuid_generate_v4()")
+                .HasColumnName("id");
+            entity.Property(e => e.Delta).HasColumnName("delta");
+            entity.Property(e => e.LineNote).HasColumnName("line_note");
+            entity.Property(e => e.PhysicalCount).HasColumnName("physical_count");
+            entity.Property(e => e.SessionId).HasColumnName("session_id");
+            entity.Property(e => e.SkuId).HasColumnName("sku_id");
+            entity.Property(e => e.SystemQtyBefore).HasColumnName("system_qty_before");
+
+            entity.HasOne(d => d.Session).WithMany(p => p.StocktakeAdjustmentLines)
+                .HasForeignKey(d => d.SessionId)
+                .HasConstraintName("stocktake_adjustment_lines_session_id_fkey");
+        });
+
+        modelBuilder.Entity<StocktakeSession>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("stocktake_sessions_pkey");
+
+            entity.ToTable("stocktake_sessions", "operations");
+
+            entity.HasIndex(e => e.LocationId, "idx_stocktake_location");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("uuid_generate_v4()")
+                .HasColumnName("id");
+            entity.Property(e => e.ConfirmedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("confirmed_at");
+            entity.Property(e => e.ConfirmedBy).HasColumnName("confirmed_by");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+            entity.Property(e => e.LocationId).HasColumnName("location_id");
+            entity.Property(e => e.Notes).HasColumnName("notes");
+            entity.Property(e => e.PerformedBy).HasColumnName("performed_by");
+            entity.Property(e => e.ProductsCounted).HasColumnName("products_counted");
+            entity.Property(e => e.SessionDate)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("session_date");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("'Open'::character varying")
+                .HasColumnName("status");
+            entity.Property(e => e.TotalDiscrepancyUnits).HasColumnName("total_discrepancy_units");
+        });
+        modelBuilder.HasSequence("operation_number_seq", "operations").StartsAt(1000L);
+
+        OnModelCreatingPartial(modelBuilder);
+    }
+
+    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+}
