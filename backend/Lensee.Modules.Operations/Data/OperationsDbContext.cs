@@ -11,6 +11,8 @@ public partial class OperationsDbContext : DbContext
     {
     }
 
+    public virtual DbSet<InventoryReceiptHeader> InventoryReceiptHeaders { get; set; }
+
     public virtual DbSet<OperationLine> OperationLines { get; set; }
 
     public virtual DbSet<OperationLog> OperationLogs { get; set; }
@@ -24,6 +26,36 @@ public partial class OperationsDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("uuid-ossp");
+
+        modelBuilder.Entity<InventoryReceiptHeader>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("inventory_receipt_headers_pkey");
+
+            entity.ToTable("inventory_receipt_headers", "operations");
+
+            entity.HasIndex(e => e.OperationId, "idx_receipt_headers_operation");
+
+            entity.HasIndex(e => e.OperationId, "inventory_receipt_headers_operation_id_key").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("uuid_generate_v4()")
+                .HasColumnName("id");
+            entity.Property(e => e.InvoiceNumber)
+                .HasMaxLength(100)
+                .HasColumnName("invoice_number");
+            entity.Property(e => e.OperationId).HasColumnName("operation_id");
+            entity.Property(e => e.ReceiptDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("receipt_date");
+            entity.Property(e => e.SupplierName)
+                .HasMaxLength(255)
+                .HasColumnName("supplier_name");
+
+            entity.HasOne(d => d.Operation).WithOne(p => p.InventoryReceiptHeader)
+                .HasForeignKey<InventoryReceiptHeader>(d => d.OperationId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("inventory_receipt_headers_operation_id_fkey");
+        });
 
         modelBuilder.Entity<OperationLine>(entity =>
         {
@@ -207,6 +239,7 @@ public partial class OperationsDbContext : DbContext
 
             entity.HasOne(d => d.Session).WithMany(p => p.StocktakeAdjustmentLines)
                 .HasForeignKey(d => d.SessionId)
+                .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("stocktake_adjustment_lines_session_id_fkey");
         });
 

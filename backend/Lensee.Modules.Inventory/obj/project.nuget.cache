@@ -1,10 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "fQBu5sioU6w=",
+  "dgSpecHash": "h/hxa8oUZj8=",
   "success": true,
   "projectFilePath": "D:\\Lensee\\backend\\Lensee.Modules.Inventory\\Lensee.Modules.Inventory.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Bola_Gerges\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
+    "C:\\Users\\Bola_Gerges\\.nuget\\packages\\mediatr\\12.4.1\\mediatr.12.4.1.nupkg.sha512",
+    "C:\\Users\\Bola_Gerges\\.nuget\\packages\\mediatr.contracts\\2.0.1\\mediatr.contracts.2.0.1.nupkg.sha512",
     "C:\\Users\\Bola_Gerges\\.nuget\\packages\\microsoft.aspnetcore.openapi\\8.0.27\\microsoft.aspnetcore.openapi.8.0.27.nupkg.sha512",
     "C:\\Users\\Bola_Gerges\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\6.0.0\\microsoft.bcl.asyncinterfaces.6.0.0.nupkg.sha512",
     "C:\\Users\\Bola_Gerges\\.nuget\\packages\\microsoft.codeanalysis.analyzers\\3.3.3\\microsoft.codeanalysis.analyzers.3.3.3.nupkg.sha512",

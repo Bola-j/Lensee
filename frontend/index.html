@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lensee</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary">
+        <a class="brand" href="#/dashboard" aria-label="Lensee dashboard">
+          <span class="brand-mark">L</span>
+          <span>Lensee</span>
+        </a>
+        <nav id="nav" class="nav"></nav>
+        <div id="session" class="session"></div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="route-label">Dashboard</p>
+            <h1 id="page-title">Operations Console</h1>
+          </div>
+          <div class="topbar-actions">
+            <span id="health-pill" class="status-pill status-muted">Checking API</span>
+            <button id="logout-button" class="icon-button" title="Log out" aria-label="Log out">L</button>
+          </div>
+        </header>
+
+        <section id="notification-area" class="notice-area" aria-live="polite"></section>
+        <section id="view" class="view"></section>
+      </main>
+    </div>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

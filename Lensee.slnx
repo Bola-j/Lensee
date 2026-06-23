@@ -9,4 +9,8 @@
     <Project Path="backend/Lensee.Modules.Payments/Lensee.Modules.Payments.csproj" />
     <Project Path="backend/Lensee.Modules.Reporting/Lensee.Modules.Reporting.csproj" />
     <Project Path="backend/Lensee.SharedKernel/Lensee.SharedKernel.csproj" />
+    <Project Path="backend/Lensee.Tests/Lensee.Tests.csproj" />
+    <Project Path="docker-compose.dcproj">
+        <Build />
+    </Project>
 </Solution>

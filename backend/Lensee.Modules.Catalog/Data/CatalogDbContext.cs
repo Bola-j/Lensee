@@ -39,9 +39,6 @@ public partial class CatalogDbContext : DbContext
             entity.Property(e => e.Name)
                 .HasMaxLength(255)
                 .HasColumnName("name");
-            entity.Property(e => e.PowerMax).HasColumnName("power_max");
-            entity.Property(e => e.PowerMin).HasColumnName("power_min");
-            entity.Property(e => e.PowerStep).HasColumnName("power_step");
         });
 
         modelBuilder.Entity<Category>(entity =>
@@ -59,7 +56,6 @@ public partial class CatalogDbContext : DbContext
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("created_at");
-            entity.Property(e => e.Level).HasColumnName("level");
             entity.Property(e => e.Name)
                 .HasMaxLength(255)
                 .HasColumnName("name");
