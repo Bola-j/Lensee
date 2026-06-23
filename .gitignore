@@ -18,3 +18,8 @@ obj/
 # Local configuration and secrets
 .env
 backend/Lensee.Host/appsettings.Development.json
+backend/Lensee.Host/appsettings.json
+
+
+.docker-compose.override.yml
+.docker-compose.yml
