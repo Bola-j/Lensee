@@ -7,6 +7,50 @@
 --   retail_clerk / Clerk123!
 --   online_clerk / Clerk123!
 
+alter table catalog.products
+add column if not exists sealed_expiry_duration varchar(50);
+
+alter table catalog.products
+add column if not exists sealed_expiry_rate varchar(20);
+
+alter table catalog.products
+add column if not exists opened_expiry_duration varchar(50);
+
+alter table catalog.products
+drop constraint if exists chk_product_type;
+
+update catalog.products
+set product_type = 'Lens'
+where product_type in ('ColoredLens', 'MedicalLens', 'PlainMedical', 'ColoredMedical', 'ContactLens');
+
+update catalog.products
+set product_type = 'Solution'
+where product_type in ('LensSolution', 'CareSolution');
+
+alter table catalog.products
+add constraint chk_product_type check (product_type in ('Lens', 'Solution'));
+
+alter table catalog.products
+drop column if exists opened_expiry_days;
+
+alter table catalog.products
+drop column if exists sealed_expiry_days;
+
+alter table catalog.products
+drop column if exists opened_expiry_duration_value;
+
+alter table catalog.products
+drop column if exists opened_expiry_duration_unit;
+
+alter table catalog.products
+drop column if exists sealed_expiry_duration_value;
+
+alter table catalog.products
+drop column if exists sealed_expiry_duration_unit;
+
+alter table inventory.inventory_batches
+drop column if exists sealed_expiry_days;
+
 insert into inventory.locations (id, name, location_type, is_active)
 values
   ('11111111-1111-1111-1111-111111111111', 'Roxy (Main)', 'MainWarehouse', true),
@@ -136,3 +180,117 @@ values
 on conflict (id) do update
 set parent_id = excluded.parent_id,
     name = excluded.name;
+
+insert into catalog.brands (id, name)
+values
+  ('20000000-0000-0000-0000-000000000001', 'Lansee'),
+  ('20000000-0000-0000-0000-000000000002', 'FreshLook'),
+  ('20000000-0000-0000-0000-000000000003', 'OptiCare')
+on conflict (id) do update
+set name = excluded.name;
+
+insert into catalog.products (
+  id,
+  category_id,
+  brand_id,
+  name,
+  product_type,
+  expiry_type,
+  sealed_expiry_duration,
+  sealed_expiry_rate,
+  opened_expiry_duration,
+  pieces_per_pack,
+  sell_mode,
+  clinical_params,
+  extended_attributes,
+  is_active
+)
+values
+  (
+    '30000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000003',
+    '20000000-0000-0000-0000-000000000002',
+    'FreshLook Color Monthly',
+    'Lens',
+    'Batch',
+    '3 years',
+    'Annually',
+    '6 months',
+    1,
+    'SinglePiece',
+    '{"duration":"monthly","diameter":"14.2"}',
+    '{"target":"cosmetic"}',
+    true
+  ),
+  (
+    '30000000-0000-0000-0000-000000000002',
+    '10000000-0000-0000-0000-000000000005',
+    '20000000-0000-0000-0000-000000000001',
+    'Lansee Clear Medical',
+    'Lens',
+    'Batch',
+    '3 years',
+    'Annually',
+    '6 months',
+    1,
+    'SinglePiece',
+    '{"duration":"monthly","baseCurve":"8.6"}',
+    '{"material":"hydrogel"}',
+    true
+  ),
+  (
+    '30000000-0000-0000-0000-000000000003',
+    '10000000-0000-0000-0000-000000000008',
+    '20000000-0000-0000-0000-000000000003',
+    'OptiCare Solution 120ml',
+    'Solution',
+    'Product',
+    '2 years',
+    'Annually',
+    '3 months',
+    1,
+    'SinglePiece',
+    null,
+    '{"volumeMl":120}',
+    true
+  )
+on conflict (id) do update
+set category_id = excluded.category_id,
+    brand_id = excluded.brand_id,
+    name = excluded.name,
+    product_type = excluded.product_type,
+    expiry_type = excluded.expiry_type,
+    sealed_expiry_duration = excluded.sealed_expiry_duration,
+    sealed_expiry_rate = excluded.sealed_expiry_rate,
+    opened_expiry_duration = excluded.opened_expiry_duration,
+    pieces_per_pack = excluded.pieces_per_pack,
+    sell_mode = excluded.sell_mode,
+    clinical_params = excluded.clinical_params,
+    extended_attributes = excluded.extended_attributes,
+    is_active = excluded.is_active;
+
+insert into catalog.skus (
+  id,
+  product_id,
+  sku_code,
+  power_sign,
+  power_value,
+  color_name,
+  size,
+  barcode,
+  is_active
+)
+values
+  ('40000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'FRE-CL-P0-BLUE', '+', 0.00, 'Blue', 'Monthly', '622000000001', true),
+  ('40000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', 'FRE-CL-P0-HAZEL', '+', 0.00, 'Hazel', 'Monthly', '622000000002', true),
+  ('40000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000002', 'LAN-PM-M125-CLEAR', '-', 1.25, 'Clear', 'Monthly', '622000000003', true),
+  ('40000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000003', 'OPT-PCS-120ML', null, null, null, '120ml', '622000000004', true)
+on conflict (id) do update
+set product_id = excluded.product_id,
+    sku_code = excluded.sku_code,
+    power_sign = excluded.power_sign,
+    power_value = excluded.power_value,
+    color_name = excluded.color_name,
+    size = excluded.size,
+    barcode = excluded.barcode,
+    is_active = excluded.is_active;

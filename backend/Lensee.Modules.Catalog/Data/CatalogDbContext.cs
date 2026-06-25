@@ -96,6 +96,15 @@ public partial class CatalogDbContext : DbContext
             entity.Property(e => e.ExpiryType)
                 .HasMaxLength(50)
                 .HasColumnName("expiry_type");
+            entity.Property(e => e.SealedExpiryDuration)
+                .HasMaxLength(50)
+                .HasColumnName("sealed_expiry_duration");
+            entity.Property(e => e.SealedExpiryRate)
+                .HasMaxLength(20)
+                .HasColumnName("sealed_expiry_rate");
+            entity.Property(e => e.OpenedExpiryDuration)
+                .HasMaxLength(50)
+                .HasColumnName("opened_expiry_duration");
             entity.Property(e => e.ExtendedAttributes)
                 .HasColumnType("jsonb")
                 .HasColumnName("extended_attributes");

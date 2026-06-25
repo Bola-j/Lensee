@@ -17,6 +17,12 @@ public partial class Product
 
     public string? ExpiryType { get; set; }
 
+    public string? SealedExpiryDuration { get; set; }
+
+    public string? SealedExpiryRate { get; set; }
+
+    public string? OpenedExpiryDuration { get; set; }
+
     public int? PiecesPerPack { get; set; }
 
     public string? SellMode { get; set; }

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Lensee.Host.Endpoints;
 using Lensee.Host.Infrastructure;
 using Lensee.Modules.Catalog.Data;
+using Lensee.Modules.Catalog.Services;
 using Lensee.Modules.CRM.Data;
 using Lensee.Modules.Identity.Data;
 using Lensee.Modules.Inventory.Data;
@@ -95,6 +96,9 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IAuditLogWriter, AuditLogWriter>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<CategoryTreeService>();
+builder.Services.AddScoped<SkuCodeGenerator>();
+builder.Services.AddScoped<ICatalogEventPublisher, NoOpCatalogEventPublisher>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("postgresql");
 
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
@@ -122,16 +126,8 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("users.read", policy => policy.RequireClaim("permission", LenseePermissions.UsersRead));
     options.AddPolicy("users.write", policy => policy.RequireClaim("permission", LenseePermissions.UsersWrite));
-    options.AddPolicy("location.scoped", policy =>
-    {
-        policy.RequireAuthenticatedUser();
-        policy.RequireAssertion(context =>
-        {
-            var role = context.User.FindFirst(LenseeClaims.Role)?.Value;
-            return !string.Equals(role, LenseeRoles.WarehouseClerk, StringComparison.OrdinalIgnoreCase)
-                || context.User.HasClaim(claim => claim.Type == LenseeClaims.LocationId);
-        });
-    });
+    options.AddPolicy("catalog.read", policy => policy.RequireClaim("permission", LenseePermissions.CatalogRead));
+    options.AddPolicy("catalog.write", policy => policy.RequireClaim("permission", LenseePermissions.CatalogWrite));
 });
 
 var app = builder.Build();
@@ -180,11 +176,7 @@ app.MapGet("/api/v1", () => Results.Ok(new
 
 app.MapAuthEndpoints();
 app.MapUserEndpoints();
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapDevSeedEndpoints();
-}
+app.MapCatalogEndpoints();
 
 app.Run();
 
@@ -205,3 +197,5 @@ static Task WriteHealthResponseAsync(HttpContext context, Microsoft.Extensions.D
 
     return context.Response.WriteAsync(JsonSerializer.Serialize(payload));
 }
+
+public partial class Program;
