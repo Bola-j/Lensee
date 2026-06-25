@@ -89,65 +89,57 @@ Acceptance tests must cover:
 
 ### Current Starting Point
 
-- Inventory read APIs already exist for locations, stock balances, batches, and stock transaction history.
-- Warehouse clerk inventory reads are location-scoped through `location.scoped`.
-- Admin can edit target quantity through `PUT /api/v1/inventory/stock-balances/{locationId}/{skuId}/target`.
-- The public/manual stock movement endpoint is intentionally not exposed. Stock movement must happen through backend workflows that call `StockLedgerService`.
-- The frontend Inventory workspace is API-backed for locations, balances, batches, transactions, and Admin target editing.
-- `StockLedgerService` now has explicit methods for receipt, available stock issue/increase, in-warehouse reserve/release, representative reserve/release, batch receipt, transaction type validation, and expected row-version checks.
-- Ledger unit tests cover receipt, append-only transaction creation, no negative availability, reserve/release transitions, no negative reserved quantities, invalid transaction type rejection, and stale row-version rejection.
-- Inventory endpoint contract tests cover inventory authorization, clerk location scoping, Admin target edits, non-Admin target edit denial, and no public manual stock transaction POST.
+- Sprint 3 is the stable checkpoint: Auth, Users, and Catalog are mapped in the API; Inventory has schema/entities but no public endpoints at the start of Sprint 4.
+- Sprint 4 is intentionally split into controlled gates:
+  - Sprint 4A: Inventory foundation only.
+  - Sprint 4B: Operations foundation later.
+  - Sprint 4C: CRM links, alerts, and notifications later.
+- Catalog product expiry stores only the use-after-opening duration. Concrete sealed expiry remains on `inventory.inventory_batches.expiry_date`.
+- Inventory quantities are stored and moved as packs. Catalog `pieces_per_pack` is not used to expand inventory balances; it is used later by retail/online B2C sales when a warehouse sells individual pieces from an opened pack.
 
 ### Sprint Goal
 
-Make inventory a reliable core service that later Operations can depend on. By the end of Sprint 4, stock movements must be append-only, balance updates must be atomic, batches must carry concrete expiry dates, and clerk reads must remain correctly location-scoped.
+Make inventory a reliable core service that later Operations can depend on. By the end of Sprint 4A, stock movements must be append-only, balance updates must be atomic, batches must carry concrete expiry dates, and clerk reads must remain correctly location-scoped.
 
 ### Backend
 
-- Harden `StockLedgerService` as the only code path that mutates `StockBalance`. `Status: in progress; first ledger mutation methods and tests are implemented.`
+- Add Inventory API policies: Admin/C-Level/WarehouseClerk read; Admin writes; Accountant has no access.
+- Implement location-scoped inventory read endpoints for locations, stock balances, batches, and transaction history.
+- Harden `StockLedgerService` as the only code path that mutates pack-based `StockBalance`, `InventoryBatch.Quantity`, and `StockTransaction`.
 - Add explicit transaction type constants/value object for:
   `Receipt`, `Sale`, `SupplyOut`, `SupplyIn`, `ReserveInWarehouse`, `ReserveWithRep`, `ReserveReleaseInWarehouse`, `ReserveReleaseWithRep`, `WriteOff`, `StocktakeAdjustment`, `ChangeOut`, `ChangeIn`, and `ReturnIn`.
 - Add ledger posting methods for:
-  - available stock increase/decrease `Done`
-  - in-warehouse reserve/release `Done`
-  - representative reserve/release `Done`
-  - batch-aware receipt `Done`
-  - batch-aware issue where the caller supplies batch allocation
-- Enforce no negative `available_qty`, `reserved_in_warehouse_qty`, or `reserved_with_rep_qty`. `Done for current ledger paths.`
-- Increment and validate `row_version` on every balance mutation. `Done for current ledger paths.`
-- Keep `stock_transactions` append-only; do not expose manual transaction creation through public API. `Done.`
-- Add batch write APIs needed before Operations:
-  - create inventory batch for received stock
-  - adjust batch quantity only through ledger-backed receipt/write-off paths
-  - list batches by SKU/location/expiry status
+  - Admin temporary receipt into batches.
+  - FEFO available stock issue service for later Operations.
+  - In-warehouse reserve/release.
+  - Representative reserve/release.
+- Enforce no negative `available_qty`, `reserved_in_warehouse_qty`, `reserved_with_rep_qty`, or batch quantity.
+- Increment `row_version` on every balance mutation.
+- Keep `stock_transactions` append-only; do not expose a generic manual stock transaction POST.
+- Add Admin-only temporary receipt endpoint:
+  - `POST /api/v1/inventory/receipts`
+  - accepts location, SKU, pack quantity, optional lot, optional expiry date, and optional notes
+  - creates/updates batch, stock balance, transaction, and audit
+  - must be replaced by Operations receipt confirmation in Sprint 4B
 - Add expiry helper behavior:
   - batch expiry is `DateOnly?`
   - product opened-expiry maximum is applied later as `min(opened_at + product.opened_expiry_duration, batch.expiry_date)`
   - sealed expiry alert queries use batch `expiry_date`
-- Add location-scoped reads for all inventory list/detail endpoints.
-- Add audit entries for target quantity edits and ledger-affecting commands.
-- Add API contract tests for inventory permissions:
-  - Admin and C-Level can read all locations.
-  - WarehouseClerk can read only own location.
-  - Accountant cannot read inventory.
-  - Admin can edit target quantity.
-  - Non-Admin roles cannot edit target quantity.
+- Keep piece-level inventory out of Sprint 4A. B2C sales in online/retail warehouses will later convert sold pieces against pack stock according to `pieces_per_pack` and `sell_mode`.
 
 ### Frontend
 
-- Turn the current Inventory workspace into a practical stock dashboard:
+- Add `/inventory` route for Admin, C-Level, and WarehouseClerk; keep Accountant blocked.
+- Build a focused stock dashboard:
   - location summary cards
   - low stock indicators using `target_qty`
   - total available/reserved counts
   - batch expiry indicators
-- Add SKU stock detail view:
-  - selected SKU balance per location
-  - batches ordered by expiry
-  - transaction history filtered by SKU/location
+- Add SKU/location filters that update balances, batches, and transactions without browser refresh.
 - Keep Admin-only target editor.
-- Add pieces and pack-equivalent display using catalog `pieces_per_pack` and `sell_mode`.
+- Add Admin-only temporary receipt form.
 - Show read-only state clearly for C-Level and WarehouseClerk.
-- Keep Accountant blocked from the Inventory route.
+- Default WarehouseClerk inventory views to their assigned location.
 
 ### QA/DevOps
 
@@ -158,17 +150,16 @@ Make inventory a reliable core service that later Operations can depend on. By t
   - every ledger post creates exactly one stock transaction
   - row version increments on mutation
   - invalid transaction type is rejected
+  - FEFO allocates earliest non-null expiry first and null expiry last
 - API/contract tests:
   - inventory route authorization by role
   - clerk location scoping
-  - target quantity validation and authorization
+  - target pack validation and authorization
+  - Admin receipt creates balance/batch/transaction
   - manual stock transaction POST remains unavailable
-- Integration tests:
-  - concurrent updates detect row-version conflicts
-  - batch receipt creates/updates balance and transaction atomically
 - Frontend checks:
   - `node --check frontend/app.js`
-  - manual smoke: Admin target edit; C-Level read-only; clerk sees own location only; Accountant blocked.
+  - manual smoke: Admin receipt and target edit; C-Level read-only; clerk sees own location only; Accountant blocked.
 
 ### Acceptance
 
@@ -178,7 +169,7 @@ Make inventory a reliable core service that later Operations can depend on. By t
 - Inventory batches retain concrete expiry dates.
 - Public API does not allow arbitrary manual stock movement.
 - Target quantities support low-stock visibility without changing stock.
-- Sprint 6 Operations can call the ledger service without adding direct balance writes.
+- Sprint 4B Operations can call the ledger service without adding direct balance writes.
 
 ## Sprint 5 - CRM, Representatives, and Return Eligibility
 

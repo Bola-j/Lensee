@@ -14,17 +14,22 @@ let catalogCategories = [];
 let categoryTree = [];
 let catalogBrands = [];
 let selectedProductId = null;
+let inventoryLocations = [];
+let inventorySkuOptions = [];
+let selectedInventoryLocationId = "";
 let activeRefreshTimer = null;
 
 const routes = {
   "/login": { title: "Sign In", label: "Identity", roles: [], render: renderLogin },
   "/dashboard": { title: "Catalog Console", label: "Dashboard", roles: ["CLevel", "Admin", "Accountant", "WarehouseClerk"], render: renderDashboard },
-  "/catalog": { title: "Catalog Workspace", label: "Catalog", roles: ["CLevel", "Admin", "WarehouseClerk"], render: renderCatalog }
+  "/catalog": { title: "Catalog Workspace", label: "Catalog", roles: ["CLevel", "Admin", "WarehouseClerk"], render: renderCatalog },
+  "/inventory": { title: "Inventory Workspace", label: "Inventory", roles: ["CLevel", "Admin", "WarehouseClerk"], render: renderInventory }
 };
 
 const navItems = [
   ["/dashboard", "Dashboard"],
-  ["/catalog", "Catalog"]
+  ["/catalog", "Catalog"],
+  ["/inventory", "Inventory"]
 ];
 
 document.getElementById("logout-button").addEventListener("click", logout);
@@ -232,10 +237,17 @@ async function refreshActiveView() {
       case "/catalog":
         await loadProducts();
         break;
+      case "/inventory":
+        await refreshInventoryTables();
+        break;
     }
   } catch {
     // Individual loaders already render actionable errors.
   }
+}
+
+function updateNotificationBadge() {
+  // Notifications are intentionally outside Sprint 4A.
 }
 
 function renderLogin() {
@@ -1075,7 +1087,7 @@ function renderInventory() {
       <div>
         <p class="eyebrow">Sprint 4</p>
         <h2>Inventory stock workspace</h2>
-        <p>Review locations, stock balances, batch expiry dates, and append-only stock transaction history.</p>
+        <p>Review pack-based stock balances, batch expiry dates, and append-only stock transaction history.</p>
       </div>
       <div class="scenario-grid">
         ${scenarioCard("Role", canWrite ? "Admin target editing" : "Read-only inventory", canWrite ? "status-ok" : "status-muted")}
@@ -1089,9 +1101,25 @@ function renderInventory() {
         <section class="band compact-band">
           <div class="section-head"><h2>Filters</h2><button id="inventory-refresh" class="button secondary" type="button">Refresh</button></div>
           <div class="field"><label for="inventory-location">Location</label><select id="inventory-location" class="select"><option value="">All available</option></select></div>
-          <div class="field"><label for="inventory-sku">SKU ID</label><input id="inventory-sku" class="input" placeholder="Optional SKU GUID"></div>
+          <div class="field"><label for="inventory-sku">SKU</label><select id="inventory-sku" class="select"><option value="">All SKUs</option></select></div>
+          <label class="check-field"><input id="inventory-include-zero-stock" type="checkbox"><span>Show zero-stock SKUs</span></label>
           <label class="check-field"><input id="inventory-include-empty" type="checkbox"><span>Show empty batches</span></label>
         </section>
+        ${canWrite ? `
+        <section class="band compact-band">
+          <h2>Receive stock</h2>
+          <form id="inventory-receipt-form" class="form">
+            <div class="form-error" id="inventory-receipt-error" hidden></div>
+            <div class="field"><label for="receipt-location">Location</label><select id="receipt-location" class="select" required></select></div>
+            <div class="field"><label for="receipt-sku">SKU</label><select id="receipt-sku" class="select" required></select></div>
+            <div class="field"><label for="receipt-quantity">Pack quantity</label><input id="receipt-quantity" class="input" type="number" min="1" step="1" required></div>
+            <div class="field"><label for="receipt-lot">Lot number</label><input id="receipt-lot" class="input" maxlength="100"></div>
+            <div class="field"><label for="receipt-expiry">Batch expiry date</label><input id="receipt-expiry" class="input" type="date"></div>
+            <div class="field"><label for="receipt-notes">Notes</label><textarea id="receipt-notes" class="input textarea"></textarea></div>
+            <p class="muted-text">Inventory is stored in packs. Pieces per pack is only used later when retail/online sales split an opened pack.</p>
+            <button class="button" type="submit">Receive packs</button>
+          </form>
+        </section>` : ""}
         <section class="band compact-band">
           <h2>Locations</h2>
           <div id="inventory-locations" class="reference-list"><span class="muted-text">Loading</span></div>
@@ -1101,12 +1129,12 @@ function renderInventory() {
       <section class="catalog-main">
         <section class="band">
           <div class="section-head"><h2>Stock balances</h2><span id="inventory-balance-count" class="muted-text">Loading</span></div>
-          <div class="table-wrap"><table><thead><tr><th>Location</th><th>SKU</th><th>Available</th><th>Reserved</th><th>Target</th><th>Updated</th>${canWrite ? "<th>Actions</th>" : ""}</tr></thead><tbody id="inventory-balances"><tr><td colspan="${canWrite ? 7 : 6}">Loading stock</td></tr></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Location</th><th>SKU</th><th>Available</th><th>Reserved</th><th>Target</th><th>Status</th><th>Updated</th>${canWrite ? "<th>Actions</th>" : ""}</tr></thead><tbody id="inventory-balances"><tr><td colspan="${canWrite ? 8 : 7}">Loading stock</td></tr></tbody></table></div>
         </section>
         <section class="catalog-detail-grid">
           <section class="band">
             <div class="section-head"><h2>Batches</h2><span id="inventory-batch-count" class="muted-text">Loading</span></div>
-            <div class="table-wrap"><table><thead><tr><th>Lot</th><th>Location</th><th>SKU</th><th>Qty</th><th>Expiry date</th><th>Notes</th></tr></thead><tbody id="inventory-batches"><tr><td colspan="6">Loading batches</td></tr></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>Lot</th><th>Location</th><th>SKU</th><th>Quantity</th><th>Expiry date</th><th>Notes</th></tr></thead><tbody id="inventory-batches"><tr><td colspan="6">Loading batches</td></tr></tbody></table></div>
           </section>
           <section class="band">
             <div class="section-head"><h2>Transactions</h2><span id="inventory-transaction-count" class="muted-text">Loading</span></div>
@@ -1122,12 +1150,15 @@ function renderInventory() {
     refreshInventoryTables();
   });
   document.getElementById("inventory-sku").addEventListener("input", debounce(refreshInventoryTables, 300));
+  document.getElementById("inventory-sku").addEventListener("change", refreshInventoryTables);
+  document.getElementById("inventory-include-zero-stock").addEventListener("change", loadInventoryBalances);
   document.getElementById("inventory-include-empty").addEventListener("change", loadInventoryBatches);
+  document.getElementById("inventory-receipt-form")?.addEventListener("submit", receiveInventoryStock);
   refreshInventoryWorkspace();
 }
 
 async function refreshInventoryWorkspace() {
-  await loadInventoryLocations();
+  await Promise.all([loadInventoryLocations(), loadInventorySkuOptions()]);
   await refreshInventoryTables();
 }
 
@@ -1145,7 +1176,16 @@ async function loadInventoryLocations() {
   try {
     inventoryLocations = await request("/api/v1/inventory/locations");
     select.innerHTML = `<option value="">All available</option>${inventoryLocations.map((location) => `<option value="${escapeHtml(location.id)}">${escapeHtml(location.name)}</option>`).join("")}`;
+    if (getAuth()?.user.locationId && !selectedInventoryLocationId) {
+      selectedInventoryLocationId = getAuth().user.locationId;
+    }
     select.value = selectedInventoryLocationId;
+    select.disabled = Boolean(getAuth()?.user.locationId);
+    const receiptLocation = document.getElementById("receipt-location");
+    if (receiptLocation) {
+      receiptLocation.innerHTML = inventoryLocations.map((location) => `<option value="${escapeHtml(location.id)}">${escapeHtml(location.name)}</option>`).join("");
+      receiptLocation.value = selectedInventoryLocationId || inventoryLocations[0]?.id || "";
+    }
     list.innerHTML = inventoryLocations.length === 0
       ? `<span class="muted-text">No locations</span>`
       : inventoryLocations.map((location) => `<button class="reference-item" type="button" data-location-id="${escapeHtml(location.id)}"><strong>${escapeHtml(location.name)}</strong><span>${escapeHtml(location.locationType)} ${location.isActive ? "Active" : "Inactive"}</span></button>`).join("");
@@ -1159,6 +1199,43 @@ async function loadInventoryLocations() {
   }
 }
 
+async function loadInventorySkuOptions() {
+  const filter = document.getElementById("inventory-sku");
+  const receipt = document.getElementById("receipt-sku");
+  try {
+    const products = await request("/api/v1/catalog/products?includeInactive=false&pageSize=100");
+    const options = [];
+    for (const product of products.items || []) {
+      const detail = await request(`/api/v1/catalog/products/${product.id}`);
+      for (const sku of detail.skus || []) {
+        if (sku.isActive) {
+          options.push({
+            id: sku.id,
+            label: `${sku.skuCode} - ${detail.name}`
+          });
+        }
+      }
+    }
+    inventorySkuOptions = options.sort((left, right) => left.label.localeCompare(right.label));
+    const optionsHtml = inventorySkuOptions.map((sku) => `<option value="${escapeHtml(sku.id)}">${escapeHtml(sku.label)}</option>`).join("");
+    if (filter) {
+      const current = filter.value;
+      filter.innerHTML = `<option value="">All SKUs</option>${optionsHtml}`;
+      filter.value = current;
+    }
+    if (receipt) {
+      receipt.innerHTML = `<option value="">Select SKU</option>${optionsHtml}`;
+    }
+  } catch (exception) {
+    if (filter) {
+      filter.innerHTML = `<option value="">Catalog unavailable</option>`;
+    }
+    if (receipt) {
+      receipt.innerHTML = `<option value="">Catalog unavailable</option>`;
+    }
+  }
+}
+
 async function loadInventoryBalances() {
   const auth = getAuth();
   const canWrite = auth?.user.role === "Admin";
@@ -1166,25 +1243,27 @@ async function loadInventoryBalances() {
   const count = document.getElementById("inventory-balance-count");
   const params = inventoryParams();
   params.set("pageSize", "50");
+  params.set("includeZeroStock", String(document.getElementById("inventory-include-zero-stock").checked));
   try {
     const result = await request(`/api/v1/inventory/stock-balances?${params.toString()}`);
     count.textContent = `${result.totalCount} balance${result.totalCount === 1 ? "" : "s"}`;
     tbody.innerHTML = result.items.length === 0
-      ? `<tr><td colspan="${canWrite ? 7 : 6}">No stock balances yet.</td></tr>`
+      ? `<tr><td colspan="${canWrite ? 8 : 7}">No stock balances yet.</td></tr>`
       : result.items.map((balance) => `
         <tr>
           <td>${escapeHtml(balance.locationName)}</td>
-          <td><code>${escapeHtml(balance.skuId)}</code></td>
-          <td>${escapeHtml(balance.availableQty)}</td>
-          <td>${escapeHtml(balance.reservedInWarehouseQty + balance.reservedWithRepQty)}</td>
-          <td>${escapeHtml(balance.targetQty ?? "-")}</td>
+          <td><strong>${escapeHtml(balance.skuCode || "Unknown SKU")}</strong><span class="muted-cell">${escapeHtml(balance.productName || balance.skuId)}</span></td>
+          <td>${quantityStack(balance.availablePacks, balance.availablePieces, balance.locationType)}</td>
+          <td>${quantityStack(balance.reservedInWarehousePacks + balance.reservedWithRepPacks, addNullable(balance.reservedInWarehousePieces, balance.reservedWithRepPieces), balance.locationType)}</td>
+          <td>${quantityStack(balance.targetPacks, balance.targetPieces, balance.locationType)}</td>
+          <td>${inventoryStockStatus(balance)}</td>
           <td>${escapeHtml(formatDateTime(balance.lastUpdated))}</td>
-          ${canWrite ? `<td><button class="button secondary table-action" type="button" data-target-location="${escapeHtml(balance.locationId)}" data-target-sku="${escapeHtml(balance.skuId)}" data-target-current="${escapeHtml(balance.targetQty ?? "")}">Set target</button></td>` : ""}
+          ${canWrite ? `<td><button class="button secondary table-action" type="button" data-target-location="${escapeHtml(balance.locationId)}" data-target-sku="${escapeHtml(balance.skuId)}" data-target-current="${escapeHtml(balance.targetPacks ?? "")}">Set target</button></td>` : ""}
         </tr>`).join("");
     tbody.querySelectorAll("[data-target-location]").forEach((button) => button.addEventListener("click", () => setInventoryTarget(button)));
   } catch (exception) {
     count.textContent = "Failed";
-    tbody.innerHTML = `<tr><td colspan="${canWrite ? 7 : 6}">${escapeHtml(getFriendlyInventoryError(exception))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${canWrite ? 8 : 7}">${escapeHtml(getFriendlyInventoryError(exception))}</td></tr>`;
   }
 }
 
@@ -1203,9 +1282,9 @@ async function loadInventoryBatches() {
         <tr>
           <td>${escapeHtml(batch.lotNumber || "-")}</td>
           <td>${escapeHtml(batch.locationName)}</td>
-          <td><code>${escapeHtml(batch.skuId)}</code></td>
-          <td>${escapeHtml(batch.quantity)}</td>
-          <td>${escapeHtml(batch.expiryDate || "-")}</td>
+          <td><strong>${escapeHtml(batch.skuCode || "Unknown SKU")}</strong><span class="muted-cell">${escapeHtml(batch.productName || batch.skuId)}</span></td>
+          <td>${quantityStack(batch.packQuantity, batch.pieceQuantity, batch.locationType)}</td>
+          <td>${expiryBadge(batch.expiryDate)}</td>
           <td>${escapeHtml(batch.notes || "-")}</td>
         </tr>`).join("");
   } catch (exception) {
@@ -1228,14 +1307,56 @@ async function loadInventoryTransactions() {
         <tr>
           <td>${escapeHtml(transaction.transactionType)}</td>
           <td>${escapeHtml(transaction.locationName)}</td>
-          <td><code>${escapeHtml(transaction.skuId)}</code></td>
-          <td>${escapeHtml(transaction.quantityChange)}</td>
+          <td><strong>${escapeHtml(transaction.skuCode || "Unknown SKU")}</strong><span class="muted-cell">${escapeHtml(transaction.productName || transaction.skuId)}</span></td>
+          <td>${quantityStack(transaction.packChange, transaction.pieceChange, transaction.locationType)}</td>
           <td>${escapeHtml(formatDateTime(transaction.createdAt))}</td>
         </tr>`).join("");
   } catch (exception) {
     count.textContent = "Failed";
     tbody.innerHTML = `<tr><td colspan="5">${escapeHtml(getFriendlyInventoryError(exception))}</td></tr>`;
   }
+}
+
+function inventoryStockStatus(balance) {
+  if (balance.targetPacks === null || balance.targetPacks === undefined) {
+    return `<span class="status-pill status-muted">No target</span>`;
+  }
+  if (balance.availablePacks <= balance.targetPacks) {
+    return `<span class="status-pill status-warn">Low stock</span>`;
+  }
+  return `<span class="status-pill status-ok">Healthy</span>`;
+}
+
+function quantityStack(packs, pieces, locationType) {
+  const packText = packs === null || packs === undefined ? "-" : `${packs} pack${Math.abs(Number(packs)) === 1 ? "" : "s"}`;
+  if (locationType === "MainWarehouse") {
+    return `<strong>${escapeHtml(packText)}</strong>`;
+  }
+  const pieceText = pieces === null || pieces === undefined ? "pieces not set" : `${pieces} piece${Math.abs(Number(pieces)) === 1 ? "" : "s"}`;
+  return `<strong>${escapeHtml(packText)}</strong><span class="muted-cell">${escapeHtml(pieceText)}</span>`;
+}
+
+function addNullable(left, right) {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return null;
+  }
+  return left + right;
+}
+
+function expiryBadge(expiryDate) {
+  if (!expiryDate) {
+    return `<span class="status-pill status-muted">No expiry</span>`;
+  }
+  const today = new Date();
+  const expiry = new Date(`${expiryDate}T00:00:00`);
+  const days = Math.ceil((expiry - today) / 86400000);
+  if (days < 0) {
+    return `<span class="status-pill status-warn">${escapeHtml(expiryDate)} expired</span>`;
+  }
+  if (days <= 90) {
+    return `<span class="status-pill status-warn">${escapeHtml(expiryDate)}</span>`;
+  }
+  return `<span class="status-pill status-ok">${escapeHtml(expiryDate)}</span>`;
 }
 
 function inventoryParams() {
@@ -1251,24 +1372,57 @@ function inventoryParams() {
   return params;
 }
 
+async function receiveInventoryStock(event) {
+  event.preventDefault();
+  clearFormError("inventory-receipt-error");
+  const quantity = Number(document.getElementById("receipt-quantity").value || 0);
+  const body = {
+    locationId: document.getElementById("receipt-location").value,
+    skuId: document.getElementById("receipt-sku").value,
+    packQuantity: quantity,
+    lotNumber: document.getElementById("receipt-lot").value || null,
+    expiryDate: document.getElementById("receipt-expiry").value || null,
+    notes: document.getElementById("receipt-notes").value || null
+  };
+  if (!body.locationId || !body.skuId || !Number.isInteger(quantity) || quantity <= 0) {
+    showFormError("inventory-receipt-error", "Location, SKU, and positive whole-number pack quantity are required.");
+    return;
+  }
+
+  try {
+    await request("/api/v1/inventory/receipts", {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+    document.getElementById("receipt-quantity").value = "";
+    document.getElementById("receipt-lot").value = "";
+    document.getElementById("receipt-expiry").value = "";
+    document.getElementById("receipt-notes").value = "";
+    notice("Stock received and ledger updated.", "success");
+    await refreshInventoryTables();
+  } catch (exception) {
+    showFormError("inventory-receipt-error", getFriendlyInventoryError(exception));
+  }
+}
+
 async function setInventoryTarget(button) {
   const current = button.dataset.targetCurrent || "";
-  const raw = window.prompt("Target quantity", current);
+  const raw = window.prompt("Target packs", current);
   if (raw === null) {
     return;
   }
   const value = raw.trim();
   if (value && (!Number.isInteger(Number(value)) || Number(value) < 0)) {
-    notice("Target quantity must be a non-negative whole number.", "error");
+    notice("Target packs must be a non-negative whole number.", "error");
     return;
   }
 
   try {
     await request(`/api/v1/inventory/stock-balances/${button.dataset.targetLocation}/${button.dataset.targetSku}/target`, {
       method: "PUT",
-      body: JSON.stringify({ targetQty: value ? Number(value) : null })
+      body: JSON.stringify({ targetPacks: value ? Number(value) : null })
     });
-    notice("Target quantity updated.", "success");
+    notice("Target packs updated.", "success");
     await loadInventoryBalances();
   } catch (exception) {
     notice(getFriendlyInventoryError(exception), "error");
@@ -1811,7 +1965,7 @@ function getFriendlyInventoryError(exception) {
     return "You do not have access to this inventory action.";
   }
   if (status === 400) {
-    return "Check the inventory filters or target quantity.";
+    return "Check the inventory filters or target packs.";
   }
   return "Could not load inventory data.";
 }

@@ -7,6 +7,7 @@ using Lensee.Modules.Catalog.Services;
 using Lensee.Modules.CRM.Data;
 using Lensee.Modules.Identity.Data;
 using Lensee.Modules.Inventory.Data;
+using Lensee.Modules.Inventory.Services;
 using Lensee.Modules.Notifications.Data;
 using Lensee.Modules.Operations.Data;
 using Lensee.Modules.Payments.Data;
@@ -99,6 +100,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<CategoryTreeService>();
 builder.Services.AddScoped<SkuCodeGenerator>();
 builder.Services.AddScoped<ICatalogEventPublisher, NoOpCatalogEventPublisher>();
+builder.Services.AddScoped<StockLedgerService>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("postgresql");
 
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
@@ -128,6 +130,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("users.write", policy => policy.RequireClaim("permission", LenseePermissions.UsersWrite));
     options.AddPolicy("catalog.read", policy => policy.RequireClaim("permission", LenseePermissions.CatalogRead));
     options.AddPolicy("catalog.write", policy => policy.RequireClaim("permission", LenseePermissions.CatalogWrite));
+    options.AddPolicy("inventory.read", policy => policy.RequireClaim("permission", LenseePermissions.InventoryRead));
+    options.AddPolicy("inventory.write", policy => policy.RequireRole(LenseeRoles.Admin).RequireClaim("permission", LenseePermissions.InventoryWrite));
 });
 
 var app = builder.Build();
@@ -177,6 +181,7 @@ app.MapGet("/api/v1", () => Results.Ok(new
 app.MapAuthEndpoints();
 app.MapUserEndpoints();
 app.MapCatalogEndpoints();
+app.MapInventoryEndpoints();
 
 app.Run();
 
