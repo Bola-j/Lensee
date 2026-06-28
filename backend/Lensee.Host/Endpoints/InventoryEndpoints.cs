@@ -20,6 +20,7 @@ public static class InventoryEndpoints
         group.MapGet("/stock-balances/{locationId:guid}/{skuId:guid}", GetStockBalanceAsync).RequireAuthorization("inventory.read");
         group.MapPut("/stock-balances/{locationId:guid}/{skuId:guid}/target", SetTargetQuantityAsync).RequireAuthorization("inventory.write");
         group.MapGet("/batches", ListBatchesAsync).RequireAuthorization("inventory.read");
+        group.MapGet("/transfer-blocked-batches", ListTransferBlockedBatchesAsync).RequireAuthorization("inventory.read");
         group.MapGet("/transactions", ListTransactionsAsync).RequireAuthorization("inventory.read");
         group.MapPost("/receipts", CreateReceiptAsync).RequireAuthorization("inventory.write");
 
@@ -245,6 +246,93 @@ public static class InventoryEndpoints
         var response = rows.Select(transaction => ToResponse(transaction, skuLookup)).ToList();
 
         return Results.Ok(new PagedResult<StockTransactionResponse>(response, request.Page, request.PageSize, total));
+    }
+
+    private static async Task<IResult> ListTransferBlockedBatchesAsync(
+        Guid? locationId,
+        Guid? skuId,
+        InventoryDbContext inventoryDbContext,
+        CatalogDbContext catalogDbContext,
+        ICurrentUser currentUser,
+        IClock clock,
+        CancellationToken cancellationToken)
+    {
+        if (!TryResolveLocationScope(currentUser, locationId, out var scopedLocationId, out var forbidden))
+        {
+            return forbidden;
+        }
+
+        var query = inventoryDbContext.InventoryBatches
+            .Include(batch => batch.Location)
+            .Where(batch => batch.Quantity > 0 && batch.ExpiryDate != null)
+            .AsQueryable();
+        if (scopedLocationId.HasValue)
+        {
+            query = query.Where(batch => batch.LocationId == scopedLocationId.Value);
+        }
+        if (skuId.HasValue)
+        {
+            query = query.Where(batch => batch.SkuId == skuId.Value);
+        }
+
+        var batches = await query
+            .OrderBy(batch => batch.ExpiryDate)
+            .ThenBy(batch => batch.Location.Name)
+            .ThenBy(batch => batch.LotNumber)
+            .ToListAsync(cancellationToken);
+        var skuIds = batches.Select(batch => batch.SkuId).Distinct().ToArray();
+        var skuLookup = await catalogDbContext.Skus
+            .Include(sku => sku.Product)
+            .Where(sku => skuIds.Contains(sku.Id))
+            .Select(sku => new
+            {
+                sku.Id,
+                sku.SkuCode,
+                ProductName = sku.Product.Name,
+                sku.Product.PiecesPerPack,
+                sku.Product.SellMode,
+                sku.Product.OpenedExpiryDuration
+            })
+            .ToDictionaryAsync(sku => sku.Id, cancellationToken);
+
+        var today = DateOnly.FromDateTime(clock.EgyptNow);
+        var rows = new List<TransferBlockedBatchResponse>();
+        foreach (var batch in batches)
+        {
+            if (!skuLookup.TryGetValue(batch.SkuId, out var sku))
+            {
+                continue;
+            }
+
+            var minimumExpiryDate = CalculateMinimumExpiryDate(today, sku.OpenedExpiryDuration);
+            var isExpired = batch.ExpiryDate < today;
+            var isTooShortForOpeningWindow = minimumExpiryDate.HasValue && batch.ExpiryDate < minimumExpiryDate.Value;
+            if (!isExpired && !isTooShortForOpeningWindow)
+            {
+                continue;
+            }
+
+            var reason = isExpired
+                ? "Expired"
+                : "Shorter than valid-after-opening duration";
+            rows.Add(new TransferBlockedBatchResponse(
+                batch.Id,
+                batch.LocationId,
+                batch.Location.Name,
+                batch.Location.LocationType,
+                batch.SkuId,
+                sku.SkuCode,
+                sku.ProductName,
+                batch.LotNumber,
+                batch.ExpiryDate,
+                batch.Quantity,
+                ToPieces(batch.Quantity, new SkuLookup(sku.Id, sku.SkuCode, sku.ProductName, sku.PiecesPerPack, sku.SellMode), batch.Location.LocationType),
+                sku.OpenedExpiryDuration,
+                minimumExpiryDate,
+                reason));
+        }
+
+        return Results.Ok(rows);
     }
 
     private static async Task<IResult> CreateReceiptAsync(
@@ -495,6 +583,28 @@ public static class InventoryEndpoints
 
     private static bool AllowsPieceDisplay(string locationType) =>
         !string.Equals(locationType, "MainWarehouse", StringComparison.OrdinalIgnoreCase);
+
+    private static DateOnly? CalculateMinimumExpiryDate(DateOnly today, string? openedExpiryDuration)
+    {
+        if (string.IsNullOrWhiteSpace(openedExpiryDuration))
+        {
+            return null;
+        }
+
+        var parts = openedExpiryDuration.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length < 2 || !int.TryParse(parts[0], out var amount) || amount <= 0)
+        {
+            return null;
+        }
+
+        return parts[1].ToLowerInvariant() switch
+        {
+            "day" or "days" => today.AddDays(amount),
+            "month" or "months" => today.AddMonths(amount),
+            "year" or "years" => today.AddYears(amount),
+            _ => null
+        };
+    }
 }
 
 public sealed record LocationResponse(Guid Id, string Name, string LocationType, bool IsActive);
@@ -547,6 +657,22 @@ public sealed record StockTransactionResponse(
     int? PieceChange,
     Guid? ReferenceOperationId,
     DateTime CreatedAt);
+
+public sealed record TransferBlockedBatchResponse(
+    Guid Id,
+    Guid LocationId,
+    string LocationName,
+    string LocationType,
+    Guid SkuId,
+    string? SkuCode,
+    string? ProductName,
+    string? LotNumber,
+    DateOnly? ExpiryDate,
+    int PackQuantity,
+    int? PieceQuantity,
+    string? OpenedExpiryDuration,
+    DateOnly? MinimumTransferExpiryDate,
+    string Reason);
 
 public sealed record TargetQuantityRequest(int? TargetPacks);
 

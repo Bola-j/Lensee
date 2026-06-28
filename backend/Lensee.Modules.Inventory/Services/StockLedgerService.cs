@@ -26,7 +26,65 @@ public sealed class StockLedgerService
         Guid? referenceOperationId = null,
         CancellationToken cancellationToken = default)
     {
+        return await ReceiveInternalAsync(
+            locationId,
+            skuId,
+            quantity,
+            userId,
+            InventoryTransactionTypes.Receipt,
+            lotNumber,
+            expiryDate,
+            notes,
+            referenceOperationId,
+            cancellationToken);
+    }
+
+    public async Task<InventoryBatch> ReceiveSupplyAsync(
+        Guid locationId,
+        Guid skuId,
+        int quantity,
+        Guid userId,
+        string? lotNumber = null,
+        DateOnly? expiryDate = null,
+        string? notes = null,
+        Guid? referenceOperationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await ReceiveInternalAsync(
+            locationId,
+            skuId,
+            quantity,
+            userId,
+            InventoryTransactionTypes.SupplyIn,
+            lotNumber,
+            expiryDate,
+            notes,
+            referenceOperationId,
+            cancellationToken);
+    }
+
+    private async Task<InventoryBatch> ReceiveInternalAsync(
+        Guid locationId,
+        Guid skuId,
+        int quantity,
+        Guid userId,
+        string transactionType,
+        string? lotNumber = null,
+        DateOnly? expiryDate = null,
+        string? notes = null,
+        Guid? referenceOperationId = null,
+        CancellationToken cancellationToken = default)
+    {
         EnsurePositive(quantity, nameof(quantity));
+        EnsureTransactionType(transactionType);
+        if (transactionType != InventoryTransactionTypes.Receipt &&
+            transactionType != InventoryTransactionTypes.SupplyIn &&
+            transactionType != InventoryTransactionTypes.ChangeOut &&
+            transactionType != InventoryTransactionTypes.ReturnIn)
+        {
+            throw new InvalidOperationException($"{transactionType} is not a receiving transaction type.");
+        }
+
         var now = _clock.EgyptNow;
         var batch = await FindBatchAsync(locationId, skuId, lotNumber, expiryDate, cancellationToken);
         if (batch is null)
@@ -54,7 +112,7 @@ public sealed class StockLedgerService
         batch.Quantity += quantity;
         var balance = await GetOrCreateBalanceAsync(locationId, skuId, cancellationToken);
         ApplyAvailableDelta(balance, quantity, now);
-        AddTransaction(locationId, skuId, InventoryTransactionTypes.Receipt, quantity, userId, referenceOperationId, now);
+        AddTransaction(locationId, skuId, transactionType, quantity, userId, referenceOperationId, now);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return batch;
     }
@@ -66,6 +124,7 @@ public sealed class StockLedgerService
         string transactionType,
         Guid userId,
         Guid? referenceOperationId = null,
+        DateOnly? minimumExpiryDate = null,
         CancellationToken cancellationToken = default)
     {
         EnsurePositive(quantity, nameof(quantity));
@@ -82,7 +141,7 @@ public sealed class StockLedgerService
             throw new InvalidOperationException("Available stock is insufficient.");
         }
 
-        var batches = await LoadFefoBatchesAsync(locationId, skuId, cancellationToken);
+        var batches = await LoadFefoBatchesAsync(locationId, skuId, minimumExpiryDate, cancellationToken);
         var remaining = quantity;
         var allocations = new List<BatchAllocation>();
         foreach (var batch in batches)
@@ -100,7 +159,9 @@ public sealed class StockLedgerService
 
         if (remaining > 0)
         {
-            throw new InvalidOperationException("Batch stock is insufficient.");
+            throw new InvalidOperationException(minimumExpiryDate.HasValue
+                ? "Batch stock that remains valid through the product opened-expiry duration is insufficient."
+                : "Batch stock is insufficient.");
         }
 
         ApplyAvailableDelta(balance, -quantity, now);
@@ -122,6 +183,110 @@ public sealed class StockLedgerService
         ApplyAvailableDelta(balance, -quantity, now);
         balance.ReservedInWarehouseQty += quantity;
         AddTransaction(locationId, skuId, InventoryTransactionTypes.ReserveInWarehouse, -quantity, userId, referenceOperationId, now);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<BatchAllocation>> ReserveInWarehouseFefoAsync(
+        Guid locationId,
+        Guid skuId,
+        int quantity,
+        Guid userId,
+        Guid? referenceOperationId = null,
+        DateOnly? minimumExpiryDate = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsurePositive(quantity, nameof(quantity));
+        var allocations = await PlanReserveInWarehouseFefoAsync(locationId, skuId, quantity, minimumExpiryDate, cancellationToken);
+
+        await ReserveInWarehouseAsync(locationId, skuId, quantity, userId, referenceOperationId, cancellationToken);
+        return allocations;
+    }
+
+    public async Task<IReadOnlyList<BatchAllocation>> PlanReserveInWarehouseFefoAsync(
+        Guid locationId,
+        Guid skuId,
+        int quantity,
+        DateOnly? minimumExpiryDate = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsurePositive(quantity, nameof(quantity));
+        var balance = await GetBalanceAsync(locationId, skuId, cancellationToken);
+        if (balance is null || balance.AvailableQty < quantity)
+        {
+            throw new InvalidOperationException("Available stock is insufficient.");
+        }
+
+        var batches = await LoadFefoBatchesAsync(locationId, skuId, minimumExpiryDate, cancellationToken);
+        var remaining = quantity;
+        var allocations = new List<BatchAllocation>();
+        foreach (var batch in batches)
+        {
+            if (remaining == 0)
+            {
+                break;
+            }
+
+            var allocated = Math.Min(batch.Quantity, remaining);
+            remaining -= allocated;
+            allocations.Add(new BatchAllocation(batch.Id, allocated, batch.LotNumber, batch.ExpiryDate));
+        }
+
+        if (remaining > 0)
+        {
+            throw new InvalidOperationException(minimumExpiryDate.HasValue
+                ? "Batch stock that remains valid through the product opened-expiry duration is insufficient."
+                : "Batch stock is insufficient.");
+        }
+
+        return allocations;
+    }
+
+    public async Task CommitReservedInWarehouseOutAsync(
+        Guid locationId,
+        Guid skuId,
+        IReadOnlyCollection<BatchAllocation> allocations,
+        Guid userId,
+        Guid? referenceOperationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (allocations.Count == 0)
+        {
+            throw new ArgumentException("At least one batch allocation is required.", nameof(allocations));
+        }
+
+        var quantity = allocations.Sum(allocation => allocation.Quantity);
+        EnsurePositive(quantity, nameof(quantity));
+        var now = _clock.EgyptNow;
+        var balance = await GetBalanceAsync(locationId, skuId, cancellationToken);
+        if (balance is null || balance.ReservedInWarehouseQty < quantity)
+        {
+            throw new InvalidOperationException("Reserved stock is insufficient.");
+        }
+
+        var batchIds = allocations.Select(allocation => allocation.BatchId).ToArray();
+        var batches = await _dbContext.InventoryBatches
+            .Where(batch => batch.LocationId == locationId && batch.SkuId == skuId && batchIds.Contains(batch.Id))
+            .ToDictionaryAsync(batch => batch.Id, cancellationToken);
+
+        foreach (var allocation in allocations)
+        {
+            if (!batches.TryGetValue(allocation.BatchId, out var batch))
+            {
+                throw new InvalidOperationException("Allocated batch was not found.");
+            }
+
+            if (batch.Quantity < allocation.Quantity)
+            {
+                throw new InvalidOperationException("Allocated batch stock is insufficient.");
+            }
+
+            batch.Quantity -= allocation.Quantity;
+        }
+
+        balance.ReservedInWarehouseQty -= quantity;
+        balance.RowVersion++;
+        balance.LastUpdated = now;
+        AddTransaction(locationId, skuId, InventoryTransactionTypes.SupplyOut, -quantity, userId, referenceOperationId, now);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -181,9 +346,13 @@ public sealed class StockLedgerService
             batch.ExpiryDate == expiryDate,
             cancellationToken);
 
-    private async Task<List<InventoryBatch>> LoadFefoBatchesAsync(Guid locationId, Guid skuId, CancellationToken cancellationToken) =>
+    private async Task<List<InventoryBatch>> LoadFefoBatchesAsync(Guid locationId, Guid skuId, DateOnly? minimumExpiryDate, CancellationToken cancellationToken) =>
         await _dbContext.InventoryBatches
-            .Where(batch => batch.LocationId == locationId && batch.SkuId == skuId && batch.Quantity > 0)
+            .Where(batch =>
+                batch.LocationId == locationId &&
+                batch.SkuId == skuId &&
+                batch.Quantity > 0 &&
+                (!minimumExpiryDate.HasValue || batch.ExpiryDate == null || batch.ExpiryDate >= minimumExpiryDate.Value))
             .OrderBy(batch => batch.ExpiryDate == null)
             .ThenBy(batch => batch.ExpiryDate)
             .ThenBy(batch => batch.CreatedAt)
@@ -269,4 +438,4 @@ public sealed class StockLedgerService
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
-public sealed record BatchAllocation(Guid BatchId, int Quantity);
+public sealed record BatchAllocation(Guid BatchId, int Quantity, string? LotNumber = null, DateOnly? ExpiryDate = null);

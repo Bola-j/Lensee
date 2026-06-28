@@ -17,19 +17,23 @@ let selectedProductId = null;
 let inventoryLocations = [];
 let inventorySkuOptions = [];
 let selectedInventoryLocationId = "";
+let operationLocations = [];
+let operationSkuOptions = [];
 let activeRefreshTimer = null;
 
 const routes = {
   "/login": { title: "Sign In", label: "Identity", roles: [], render: renderLogin },
   "/dashboard": { title: "Catalog Console", label: "Dashboard", roles: ["CLevel", "Admin", "Accountant", "WarehouseClerk"], render: renderDashboard },
   "/catalog": { title: "Catalog Workspace", label: "Catalog", roles: ["CLevel", "Admin", "WarehouseClerk"], render: renderCatalog },
-  "/inventory": { title: "Inventory Workspace", label: "Inventory", roles: ["CLevel", "Admin", "WarehouseClerk"], render: renderInventory }
+  "/inventory": { title: "Inventory Workspace", label: "Inventory", roles: ["CLevel", "Admin", "WarehouseClerk"], render: renderInventory },
+  "/operations": { title: "Operations Workspace", label: "Operations", roles: ["CLevel", "Admin", "Accountant", "WarehouseClerk"], render: renderOperations }
 };
 
 const navItems = [
   ["/dashboard", "Dashboard"],
   ["/catalog", "Catalog"],
-  ["/inventory", "Inventory"]
+  ["/inventory", "Inventory"],
+  ["/operations", "Operations"]
 ];
 
 document.getElementById("logout-button").addEventListener("click", logout);
@@ -239,6 +243,9 @@ async function refreshActiveView() {
         break;
       case "/inventory":
         await refreshInventoryTables();
+        break;
+      case "/operations":
+        await loadOperations();
         break;
     }
   } catch {
@@ -1129,7 +1136,24 @@ function renderInventory() {
       <section class="catalog-main">
         <section class="band">
           <div class="section-head"><h2>Stock balances</h2><span id="inventory-balance-count" class="muted-text">Loading</span></div>
-          <div class="table-wrap"><table><thead><tr><th>Location</th><th>SKU</th><th>Available</th><th>Reserved</th><th>Target</th><th>Status</th><th>Updated</th>${canWrite ? "<th>Actions</th>" : ""}</tr></thead><tbody id="inventory-balances"><tr><td colspan="${canWrite ? 8 : 7}">Loading stock</td></tr></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Location</th><th>SKU</th><th>Available</th><th>Reserved</th><th>Meant to be</th><th>Needed</th><th>Status</th><th>Updated</th>${canWrite ? "<th>Actions</th>" : ""}</tr></thead><tbody id="inventory-balances"><tr><td colspan="${canWrite ? 9 : 8}">Loading stock</td></tr></tbody></table></div>
+        </section>
+        <section class="band">
+          <div class="section-head">
+            <div><h2>Daily replenishment</h2><p>Online and retail targets are topped up from MainWarehouse through reserved warehouse transfers.</p></div>
+            <div class="inline-actions">
+              <span id="inventory-replenishment-count" class="muted-text">Loading</span>
+              ${canWrite ? `<button id="reserve-replenishment" class="button secondary" type="button">Run daily reset</button>` : ""}
+            </div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Destination</th><th>SKU</th><th>Available</th><th>Incoming</th><th>Meant to be</th><th>Needed</th><th>Main available</th></tr></thead><tbody id="inventory-replenishment"><tr><td colspan="7">Loading replenishment</td></tr></tbody></table></div>
+        </section>
+        <section class="band">
+          <div class="section-head">
+            <div><h2>Blocked for transfer</h2><p>Expired batches and batches expiring before the valid-after-opening window are skipped by FEFO transfers.</p></div>
+            <span id="inventory-blocked-count" class="muted-text">Loading</span>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Location</th><th>SKU</th><th>Lot</th><th>Quantity</th><th>Expiry</th><th>Reason</th><th>Needed through</th></tr></thead><tbody id="inventory-blocked-batches"><tr><td colspan="7">Loading blocked batches</td></tr></tbody></table></div>
         </section>
         <section class="catalog-detail-grid">
           <section class="band">
@@ -1154,6 +1178,7 @@ function renderInventory() {
   document.getElementById("inventory-include-zero-stock").addEventListener("change", loadInventoryBalances);
   document.getElementById("inventory-include-empty").addEventListener("change", loadInventoryBatches);
   document.getElementById("inventory-receipt-form")?.addEventListener("submit", receiveInventoryStock);
+  document.getElementById("reserve-replenishment")?.addEventListener("click", reserveInventoryReplenishment);
   refreshInventoryWorkspace();
 }
 
@@ -1165,6 +1190,8 @@ async function refreshInventoryWorkspace() {
 async function refreshInventoryTables() {
   await Promise.all([
     loadInventoryBalances(),
+    loadInventoryReplenishment(),
+    loadTransferBlockedBatches(),
     loadInventoryBatches(),
     loadInventoryTransactions()
   ]);
@@ -1248,7 +1275,7 @@ async function loadInventoryBalances() {
     const result = await request(`/api/v1/inventory/stock-balances?${params.toString()}`);
     count.textContent = `${result.totalCount} balance${result.totalCount === 1 ? "" : "s"}`;
     tbody.innerHTML = result.items.length === 0
-      ? `<tr><td colspan="${canWrite ? 8 : 7}">No stock balances yet.</td></tr>`
+      ? `<tr><td colspan="${canWrite ? 9 : 8}">No stock balances yet.</td></tr>`
       : result.items.map((balance) => `
         <tr>
           <td>${escapeHtml(balance.locationName)}</td>
@@ -1256,6 +1283,7 @@ async function loadInventoryBalances() {
           <td>${quantityStack(balance.availablePacks, balance.availablePieces, balance.locationType)}</td>
           <td>${quantityStack(balance.reservedInWarehousePacks + balance.reservedWithRepPacks, addNullable(balance.reservedInWarehousePieces, balance.reservedWithRepPieces), balance.locationType)}</td>
           <td>${quantityStack(balance.targetPacks, balance.targetPieces, balance.locationType)}</td>
+          <td>${quantityStack(inventoryShortagePacks(balance), inventoryShortagePieces(balance), balance.locationType)}</td>
           <td>${inventoryStockStatus(balance)}</td>
           <td>${escapeHtml(formatDateTime(balance.lastUpdated))}</td>
           ${canWrite ? `<td><button class="button secondary table-action" type="button" data-target-location="${escapeHtml(balance.locationId)}" data-target-sku="${escapeHtml(balance.skuId)}" data-target-current="${escapeHtml(balance.targetPacks ?? "")}">Set target</button></td>` : ""}
@@ -1263,7 +1291,37 @@ async function loadInventoryBalances() {
     tbody.querySelectorAll("[data-target-location]").forEach((button) => button.addEventListener("click", () => setInventoryTarget(button)));
   } catch (exception) {
     count.textContent = "Failed";
-    tbody.innerHTML = `<tr><td colspan="${canWrite ? 8 : 7}">${escapeHtml(getFriendlyInventoryError(exception))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${canWrite ? 9 : 8}">${escapeHtml(getFriendlyInventoryError(exception))}</td></tr>`;
+  }
+}
+
+async function loadInventoryReplenishment() {
+  const tbody = document.getElementById("inventory-replenishment");
+  const count = document.getElementById("inventory-replenishment-count");
+  if (!tbody || !count) {
+    return;
+  }
+
+  const params = inventoryParams();
+  try {
+    const rows = await request(`/api/v1/operations/replenishment?${params.toString()}`);
+    const shortages = rows.filter((row) => row.shortagePacks > 0);
+    count.textContent = `${shortages.length} shortage${shortages.length === 1 ? "" : "s"}`;
+    tbody.innerHTML = rows.length === 0
+      ? `<tr><td colspan="7">No target-stock rows yet.</td></tr>`
+      : rows.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.destinationLocationName)}</td>
+          <td><strong>${escapeHtml(row.skuCode || "Unknown SKU")}</strong><span class="muted-cell">${escapeHtml(row.productName || row.skuId)}</span></td>
+          <td>${quantityStack(row.availablePacks, row.availablePieces, row.destinationLocationType)}</td>
+          <td>${quantityStack(row.incomingPacks, row.incomingPieces, row.destinationLocationType)}</td>
+          <td>${quantityStack(row.targetPacks, row.targetPieces, row.destinationLocationType)}</td>
+          <td>${row.shortagePacks > 0 ? `<span class="status-pill status-warn">${quantityText(row.shortagePacks, row.shortagePieces, row.destinationLocationType)}</span>` : `<span class="status-pill status-ok">Covered</span>`}</td>
+          <td>${quantityStack(row.mainAvailablePacks, null, "MainWarehouse")}</td>
+        </tr>`).join("");
+  } catch (exception) {
+    count.textContent = "Failed";
+    tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(getFriendlyWorkspaceError(exception))}</td></tr>`;
   }
 }
 
@@ -1290,6 +1348,35 @@ async function loadInventoryBatches() {
   } catch (exception) {
     count.textContent = "Failed";
     tbody.innerHTML = `<tr><td colspan="6">${escapeHtml(getFriendlyInventoryError(exception))}</td></tr>`;
+  }
+}
+
+async function loadTransferBlockedBatches() {
+  const tbody = document.getElementById("inventory-blocked-batches");
+  const count = document.getElementById("inventory-blocked-count");
+  if (!tbody || !count) {
+    return;
+  }
+
+  const params = inventoryParams();
+  try {
+    const rows = await request(`/api/v1/inventory/transfer-blocked-batches?${params.toString()}`);
+    count.textContent = `${rows.length} blocked`;
+    tbody.innerHTML = rows.length === 0
+      ? `<tr><td colspan="7">No expired or transfer-blocked short-expiry batches.</td></tr>`
+      : rows.map((batch) => `
+        <tr>
+          <td>${escapeHtml(batch.locationName)}</td>
+          <td><strong>${escapeHtml(batch.skuCode || "Unknown SKU")}</strong><span class="muted-cell">${escapeHtml(batch.productName || batch.skuId)}</span></td>
+          <td>${escapeHtml(batch.lotNumber || "-")}</td>
+          <td>${quantityStack(batch.packQuantity, batch.pieceQuantity, batch.locationType)}</td>
+          <td>${expiryBadge(batch.expiryDate)}</td>
+          <td><span class="status-pill status-warn">${escapeHtml(batch.reason || "Blocked")}</span></td>
+          <td>${batch.minimumTransferExpiryDate ? `<span class="status-pill status-warn">${escapeHtml(batch.minimumTransferExpiryDate)}</span>` : `<span class="status-pill status-muted">Expired</span>`}<span class="muted-cell">${escapeHtml(batch.openedExpiryDuration || "No opening duration")}</span></td>
+        </tr>`).join("");
+  } catch (exception) {
+    count.textContent = "Failed";
+    tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(getFriendlyInventoryError(exception))}</td></tr>`;
   }
 }
 
@@ -1321,10 +1408,25 @@ function inventoryStockStatus(balance) {
   if (balance.targetPacks === null || balance.targetPacks === undefined) {
     return `<span class="status-pill status-muted">No target</span>`;
   }
-  if (balance.availablePacks <= balance.targetPacks) {
+  if (balance.availablePacks < balance.targetPacks) {
     return `<span class="status-pill status-warn">Low stock</span>`;
   }
   return `<span class="status-pill status-ok">Healthy</span>`;
+}
+
+function inventoryShortagePacks(balance) {
+  if (balance.targetPacks === null || balance.targetPacks === undefined) {
+    return null;
+  }
+  return Math.max(Number(balance.targetPacks) - Number(balance.availablePacks), 0);
+}
+
+function inventoryShortagePieces(balance) {
+  const shortage = inventoryShortagePacks(balance);
+  if (shortage === null || balance.availablePieces === null || balance.availablePieces === undefined || !balance.piecesPerPack) {
+    return null;
+  }
+  return shortage * Number(balance.piecesPerPack);
 }
 
 function quantityStack(packs, pieces, locationType) {
@@ -1334,6 +1436,15 @@ function quantityStack(packs, pieces, locationType) {
   }
   const pieceText = pieces === null || pieces === undefined ? "pieces not set" : `${pieces} piece${Math.abs(Number(pieces)) === 1 ? "" : "s"}`;
   return `<strong>${escapeHtml(packText)}</strong><span class="muted-cell">${escapeHtml(pieceText)}</span>`;
+}
+
+function quantityText(packs, pieces, locationType) {
+  const packText = `${packs} pack${Math.abs(Number(packs)) === 1 ? "" : "s"}`;
+  if (locationType === "MainWarehouse" || pieces === null || pieces === undefined) {
+    return packText;
+  }
+
+  return `${packText} / ${pieces} piece${Math.abs(Number(pieces)) === 1 ? "" : "s"}`;
 }
 
 function addNullable(left, right) {
@@ -1426,6 +1537,24 @@ async function setInventoryTarget(button) {
     await loadInventoryBalances();
   } catch (exception) {
     notice(getFriendlyInventoryError(exception), "error");
+  }
+}
+
+async function reserveInventoryReplenishment() {
+  try {
+    const locationId = document.getElementById("inventory-location")?.value || null;
+    const skuId = document.getElementById("inventory-sku")?.value || null;
+    const result = await request("/api/v1/operations/replenishment/daily-reset", {
+      method: "POST",
+      body: JSON.stringify({ locationId, skuId })
+    });
+    const alertText = result.alerts?.length
+      ? ` Alert: ${result.alerts.map((alert) => `${alert.skuCode || alert.skuId} at ${alert.destinationLocationName}: ${alert.message}`).join(" | ")}`
+      : "";
+    notice(`Reserved ${result.createdOperations} replenishment transfer(s). ${result.unfilledPacks} pack(s) still uncovered.${alertText}`, result.unfilledPacks > 0 ? "info" : "success");
+    await refreshInventoryTables();
+  } catch (exception) {
+    notice(getFriendlyWorkspaceError(exception), "error");
   }
 }
 
@@ -1599,42 +1728,48 @@ async function renderOperations() {
   document.getElementById("view").innerHTML = `
     <section class="band">
       <div class="section-head">
-        <div><h2>Draft operation</h2><p>Create receipts, sales, reserves, supply, write-off, change, and return flows.</p></div>
+        <div><h2>Operations foundation</h2><p>Receive external stock into MainWarehouse, then reserve, ship, and receive warehouse transfers.</p></div>
         <span id="operation-count" class="status-pill status-muted">Loading</span>
       </div>
       ${canWrite ? `
         <form id="operation-form" class="form grid-form">
-          <div class="field"><label for="op-type">Type</label><select id="op-type" class="select"><option>InventoryReceipt</option><option>WholesaleSale</option><option>RetailSale</option><option>Reserve</option><option>Supply</option><option>WriteOff</option><option>Change</option><option>Return</option></select></div>
-          <div class="field"><label for="op-client">Merchant/client</label><select id="op-client" class="select"></select></div>
+          <div class="field"><label for="op-type">Type</label><select id="op-type" class="select"><option value="InventoryReceipt">Inventory receipt</option><option value="WarehouseTransfer">Warehouse transfer</option></select></div>
           <div class="field"><label for="op-source">Source location</label><select id="op-source" class="select"></select></div>
           <div class="field"><label for="op-destination">Destination location</label><select id="op-destination" class="select"></select></div>
-          <div class="field"><label for="op-sku">SKU</label><select id="op-sku" class="select"></select></div>
-          <div class="field"><label for="op-qty">Quantity</label><input id="op-qty" class="input" type="number" min="1" value="1"></div>
-          <div class="field"><label for="op-section">Line section</label><select id="op-section" class="select"><option>Standard</option><option>WithRep</option><option>Return</option><option>ChangeOut</option><option>ChangeIn</option></select></div>
-          <div class="field"><label for="op-sku-2">Second SKU</label><select id="op-sku-2" class="select"></select></div>
-          <div class="field"><label for="op-qty-2">Second qty</label><input id="op-qty-2" class="input" type="number" min="0" value="0"></div>
-          <div class="field"><label for="op-section-2">Second section</label><select id="op-section-2" class="select"><option>ChangeIn</option><option>ChangeOut</option><option>Return</option><option>Standard</option></select></div>
-          <div class="field"><label for="op-expiry">Receipt expiry</label><input id="op-expiry" class="input" type="date"></div>
-          <div class="field"><label for="op-lot">Receipt lot</label><input id="op-lot" class="input"></div>
+          <div class="field"><label for="op-supplier">Supplier</label><input id="op-supplier" class="input" autocomplete="off" placeholder="Receipt only"></div>
+          <div class="field"><label for="op-invoice">Invoice</label><input id="op-invoice" class="input" autocomplete="off" placeholder="Receipt only"></div>
+          <div class="field full-span"><label for="op-notes">Notes</label><input id="op-notes" class="input" autocomplete="off"></div>
+          <div class="field full-span">
+            <div class="section-head tight-head"><label>Operation lines</label><button id="op-add-line" class="button secondary" type="button">Add line</button></div>
+            <div id="op-lines" class="line-editor"></div>
+          </div>
           <button class="button primary" type="submit">Save draft</button>
         </form>` : `<p>This role can inspect operations but cannot create drafts.</p>`}
+      <div class="toolbar">
+        <label class="check-field"><input id="operations-show-completed" type="checkbox"><span>Show received/cancelled history</span></label>
+      </div>
       <div class="table-wrap">
-        <table><thead><tr><th>No.</th><th>Type</th><th>Status</th><th>Client</th><th>Created</th><th>Action</th></tr></thead><tbody id="operation-rows"></tbody></table>
+        <table><thead><tr><th>No.</th><th>Type</th><th>Status</th><th>Route</th><th>Created</th><th>Action</th></tr></thead><tbody id="operation-rows"></tbody></table>
       </div>
     </section>`;
 
   if (canWrite) {
-    await Promise.all([hydrateOperationLocations(), hydrateOperationSkus(), hydrateOperationMerchants()]);
+    await Promise.all([hydrateOperationLocations(), hydrateOperationSkus()]);
+    document.getElementById("op-type").addEventListener("change", syncOperationTypeControls);
+    document.getElementById("op-add-line").addEventListener("click", () => addOperationLine());
+    addOperationLine();
+    syncOperationTypeControls();
     document.getElementById("operation-form").addEventListener("submit", createOperationDraft);
   }
+  document.getElementById("operations-show-completed").addEventListener("change", loadOperations);
   await loadOperations();
 }
 
 async function hydrateOperationLocations() {
-  const locations = await request("/api/v1/inventory/locations");
+  operationLocations = await request("/api/v1/inventory/locations");
   for (const id of ["op-source", "op-destination"]) {
     const select = document.getElementById(id);
-    select.innerHTML = `<option value="">-</option>${locations.map((location) => `<option value="${escapeHtml(location.id)}">${escapeHtml(location.name)}</option>`).join("")}`;
+    select.innerHTML = `<option value="">-</option>${operationLocations.map((location) => `<option value="${escapeHtml(location.id)}">${escapeHtml(location.name)}</option>`).join("")}`;
   }
 }
 
@@ -1649,17 +1784,60 @@ async function hydrateOperationSkus() {
   }
   operationSkuOptions = skus;
   const options = skus.map((sku) => `<option value="${escapeHtml(sku.id)}">${escapeHtml(sku.label)}</option>`).join("");
-  document.getElementById("op-sku").innerHTML = options;
-  document.getElementById("op-sku-2").innerHTML = `<option value="">-</option>${options}`;
+  document.querySelectorAll(".op-line-sku").forEach((select) => {
+    const current = select.value;
+    select.innerHTML = `<option value="">Select SKU</option>${options}`;
+    select.value = current;
+  });
 }
 
-async function hydrateOperationMerchants() {
-  try {
-    const result = await request("/api/v1/crm/merchants?includeInactive=false&pageSize=100");
-    document.getElementById("op-client").innerHTML = `<option value="">-</option>${(result.items || []).map((merchant) => `<option value="${escapeHtml(merchant.id)}">${escapeHtml(merchant.businessName)}</option>`).join("")}`;
-  } catch {
-    document.getElementById("op-client").innerHTML = `<option value="">CRM unavailable</option>`;
+function addOperationLine(line = {}) {
+  const container = document.getElementById("op-lines");
+  if (!container) {
+    return;
   }
+
+  const row = document.createElement("div");
+  row.className = "line-editor-row";
+  row.innerHTML = `
+    <div class="field"><label>SKU</label><select class="select op-line-sku" required><option value="">Select SKU</option>${operationSkuOptions.map((sku) => `<option value="${escapeHtml(sku.id)}">${escapeHtml(sku.label)}</option>`).join("")}</select></div>
+    <div class="field"><label>Packs</label><input class="input op-line-qty" type="number" min="1" step="1" value="${escapeHtml(line.packQuantity || 1)}" required></div>
+    <div class="field op-line-receipt-field"><label>Lot</label><input class="input op-line-lot" maxlength="100" value="${escapeHtml(line.lotNumber || "")}"></div>
+    <div class="field op-line-receipt-field"><label>Batch expiry</label><input class="input op-line-expiry" type="date" value="${escapeHtml(line.expiryDate || "")}"></div>
+    <button class="icon-button op-remove-line" type="button" title="Remove line">x</button>`;
+  row.querySelector(".op-line-sku").value = line.skuId || "";
+  row.querySelector(".op-remove-line").addEventListener("click", () => {
+    if (container.querySelectorAll(".line-editor-row").length > 1) {
+      row.remove();
+    }
+  });
+  container.appendChild(row);
+  syncOperationTypeControls();
+}
+
+function syncOperationTypeControls() {
+  const type = document.getElementById("op-type").value;
+  const source = document.getElementById("op-source");
+  const destination = document.getElementById("op-destination");
+  const main = operationLocations.find((location) => location.locationType === "MainWarehouse");
+  const nonMain = operationLocations.filter((location) => location.locationType !== "MainWarehouse");
+
+  if (type === "InventoryReceipt") {
+    source.innerHTML = `<option value="">External supplier</option>`;
+    destination.innerHTML = main ? `<option value="${escapeHtml(main.id)}">${escapeHtml(main.name)}</option>` : `<option value="">MainWarehouse unavailable</option>`;
+    document.getElementById("op-supplier").disabled = false;
+    document.getElementById("op-invoice").disabled = false;
+    document.querySelectorAll(".op-line-receipt-field input").forEach((input) => { input.disabled = false; });
+    document.querySelectorAll(".op-line-receipt-field").forEach((field) => { field.hidden = false; });
+    return;
+  }
+
+  source.innerHTML = main ? `<option value="${escapeHtml(main.id)}">${escapeHtml(main.name)}</option>` : `<option value="">MainWarehouse unavailable</option>`;
+  destination.innerHTML = `<option value="">Select destination</option>${nonMain.map((location) => `<option value="${escapeHtml(location.id)}">${escapeHtml(location.name)}</option>`).join("")}`;
+  document.getElementById("op-supplier").disabled = true;
+  document.getElementById("op-invoice").disabled = true;
+  document.querySelectorAll(".op-line-receipt-field input").forEach((input) => { input.disabled = true; input.value = ""; });
+  document.querySelectorAll(".op-line-receipt-field").forEach((field) => { field.hidden = true; });
 }
 
 async function loadOperations() {
@@ -1669,17 +1847,23 @@ async function loadOperations() {
   const canWrite = ["Admin", "WarehouseClerk"].includes(auth?.user.role);
   try {
     const result = await request("/api/v1/operations?pageSize=50");
-    count.textContent = `${result.totalCount} operations`;
-    tbody.innerHTML = result.items.length === 0 ? `<tr><td colspan="6">No operations yet.</td></tr>` : result.items.map((operation) => `
+    const showCompleted = document.getElementById("operations-show-completed")?.checked;
+    const items = showCompleted
+      ? result.items
+      : result.items.filter((operation) => !["Received", "Cancelled"].includes(operation.status));
+    count.textContent = showCompleted ? `${result.totalCount} operations` : `${items.length} active`;
+    tbody.innerHTML = items.length === 0 ? `<tr><td colspan="6">No active operations.</td></tr>` : items.map((operation) => `
       <tr>
-        <td>${escapeHtml(operation.operationNumber)}</td>
+        <td><strong>${escapeHtml(operation.operationNumber)}</strong></td>
         <td>${escapeHtml(operation.operationType)}</td>
-        <td><span class="status-pill ${operation.status === "Confirmed" ? "status-ok" : "status-muted"}">${escapeHtml(operation.status)}</span></td>
-        <td>${escapeHtml(operation.clientName || "-")}</td>
+        <td><span class="status-pill ${operationStatusClass(operation.status)}">${escapeHtml(operation.status)}</span></td>
+        <td>${escapeHtml(formatOperationRoute(operation))}</td>
         <td>${escapeHtml(formatDateTime(operation.createdAt))}</td>
-        <td>${canWrite && operation.status === "Draft" ? `<button class="button secondary table-action" type="button" data-confirm-op="${escapeHtml(operation.id)}">Confirm</button>` : "-"}</td>
-      </tr>`).join("");
-    tbody.querySelectorAll("[data-confirm-op]").forEach((button) => button.addEventListener("click", () => confirmOperation(button.dataset.confirmOp)));
+        <td>${renderOperationActions(operation, canWrite)}</td>
+      </tr>
+      <tr class="operation-detail-row" id="operation-detail-${escapeHtml(operation.id)}" hidden><td colspan="6"><div class="operation-detail">Loading</div></td></tr>`).join("");
+    tbody.querySelectorAll("[data-op-toggle]").forEach((button) => button.addEventListener("click", () => toggleOperationDetails(button.dataset.opId, button)));
+    tbody.querySelectorAll("[data-op-action]").forEach((button) => button.addEventListener("click", () => runOperationAction(button.dataset.opAction, button.dataset.opId, button)));
   } catch (exception) {
     count.textContent = "Failed";
     tbody.innerHTML = `<tr><td colspan="6">${escapeHtml(getFriendlyWorkspaceError(exception))}</td></tr>`;
@@ -1689,8 +1873,8 @@ async function loadOperations() {
 async function createOperationDraft(event) {
   event.preventDefault();
   const type = document.getElementById("op-type").value;
-  const quantity = Number(document.getElementById("op-qty").value);
-  const validationMessage = validateOperationForm(type, quantity);
+  const lines = readOperationLines(type);
+  const validationMessage = validateOperationForm(type, lines);
   if (validationMessage) {
     notice(validationMessage, "error");
     return;
@@ -1700,100 +1884,178 @@ async function createOperationDraft(event) {
     operationType: type,
     sourceLocationId: document.getElementById("op-source").value || null,
     destinationLocationId: document.getElementById("op-destination").value || null,
-    clientId: document.getElementById("op-client").value || null,
-    receipt: type === "InventoryReceipt" ? { supplierName: "Manual test", invoiceNumber: document.getElementById("op-lot").value || null } : null,
-    lines: [{
-      skuId: document.getElementById("op-sku").value,
-      quantity,
-      section: document.getElementById("op-section").value,
-      expiryDate: document.getElementById("op-expiry").value || null,
-      lotNumber: document.getElementById("op-lot").value || null
-    }]
+    notes: document.getElementById("op-notes").value || null,
+    receipt: type === "InventoryReceipt" ? { supplierName: document.getElementById("op-supplier").value || "Supplier", invoiceNumber: document.getElementById("op-invoice").value || null } : null,
+    lines
   };
-
-  const secondSkuId = document.getElementById("op-sku-2").value;
-  const secondQuantity = Number(document.getElementById("op-qty-2").value);
-  if (secondSkuId && secondQuantity > 0) {
-    body.lines.push({
-      skuId: secondSkuId,
-      quantity: secondQuantity,
-      section: document.getElementById("op-section-2").value,
-      expiryDate: document.getElementById("op-expiry").value || null,
-      lotNumber: document.getElementById("op-lot").value || null
-    });
-  }
-
-  if (type === "InventoryReceipt" && !body.destinationLocationId && body.sourceLocationId) {
-    body.destinationLocationId = body.sourceLocationId;
-  }
 
   try {
     await request("/api/v1/operations", { method: "POST", body: JSON.stringify(body) });
     notice("Draft saved.", "success");
+    event.target.reset();
+    document.getElementById("op-lines").innerHTML = "";
+    addOperationLine();
+    syncOperationTypeControls();
     await loadOperations();
   } catch (exception) {
     notice(getFriendlyWorkspaceError(exception), "error");
   }
 }
 
-function validateOperationForm(type, quantity) {
+function readOperationLines(type) {
+  return Array.from(document.querySelectorAll(".line-editor-row")).map((row) => ({
+    skuId: row.querySelector(".op-line-sku").value,
+    packQuantity: Number(row.querySelector(".op-line-qty").value),
+    expiryDate: type === "InventoryReceipt" ? row.querySelector(".op-line-expiry").value || null : null,
+    lotNumber: type === "InventoryReceipt" ? row.querySelector(".op-line-lot").value || null : null,
+    notes: null
+  }));
+}
+
+function validateOperationForm(type, lines) {
   const source = document.getElementById("op-source").value;
   const destination = document.getElementById("op-destination").value;
-  const merchant = document.getElementById("op-client").value;
-  const section = document.getElementById("op-section").value;
-  const secondSku = document.getElementById("op-sku-2").value;
-  const secondQuantity = Number(document.getElementById("op-qty-2").value);
-  const secondSection = document.getElementById("op-section-2").value;
+  const main = operationLocations.find((location) => location.locationType === "MainWarehouse");
 
-  if (!document.getElementById("op-sku").value) {
-    return "Select a SKU.";
+  if (lines.length === 0) {
+    return "Add at least one operation line.";
   }
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    return "Quantity must be a whole number greater than zero.";
+  if (lines.some((line) => !line.skuId)) {
+    return "Select a SKU for every line.";
   }
-  if (secondQuantity && (!Number.isInteger(secondQuantity) || secondQuantity < 0)) {
-    return "Second quantity must be a non-negative whole number.";
+  if (new Set(lines.map((line) => line.skuId)).size !== lines.length) {
+    return "Each SKU can appear only once per operation.";
   }
-  if (["WholesaleSale", "RetailSale", "Return", "Change"].includes(type) && !merchant) {
-    return `${type} requires a merchant/client.`;
+  if (lines.some((line) => !Number.isInteger(line.packQuantity) || line.packQuantity < 1)) {
+    return "Every pack quantity must be a whole number greater than zero.";
   }
-  if (["WholesaleSale", "RetailSale", "Reserve", "WriteOff"].includes(type) && !source) {
-    return `${type} requires a source location.`;
+  if (!main) {
+    return "MainWarehouse must exist before operations can be created.";
   }
-  if (type === "Supply" && (!source || !destination)) {
-    return "Supply requires both source and destination locations.";
+  if (type === "InventoryReceipt" && destination !== main.id) {
+    return "Inventory receipt destination must be MainWarehouse.";
   }
-  if (type === "InventoryReceipt" && !destination && !source) {
-    return "Inventory receipt requires a receiving location.";
-  }
-  if (type === "Return") {
-    if (section === "ChangeIn" || secondSection === "ChangeIn") {
-      return "Return is one-sided and cannot include replacement lines.";
-    }
-    if (section !== "Return") {
-      return "Return lines must use the Return section.";
-    }
-  }
-  if (type === "Change") {
-    const sections = [section];
-    if (secondSku && secondQuantity > 0) {
-      sections.push(secondSection);
-    }
-    if (!sections.includes("ChangeOut") || !sections.includes("ChangeIn")) {
-      return "Change requires one ChangeOut line and one ChangeIn line.";
-    }
+  if (type === "WarehouseTransfer" && (source !== main.id || !destination || destination === main.id)) {
+    return "Warehouse transfer must move packs from MainWarehouse to a non-main destination.";
   }
 
   return "";
 }
 
-async function confirmOperation(operationId) {
+function renderOperationActions(operation, canWrite) {
+  const detailButton = `<button class="button secondary table-action" type="button" data-op-toggle="details" data-op-id="${escapeHtml(operation.id)}">Details</button>`;
+  if (!canWrite) {
+    return detailButton;
+  }
+  const actions = [];
+  if (operation.status === "Draft") {
+    actions.push(["confirm", "Confirm"], ["cancel", "Cancel"]);
+  } else if (operation.operationType === "WarehouseTransfer" && operation.status === "Reserved") {
+    actions.push(["ship", "Ship"], ["receive", "Receive"], ["cancel", "Cancel"]);
+  } else if (operation.operationType === "WarehouseTransfer" && operation.status === "Shipped") {
+    actions.push(["receive", "Receive"], ["cancel", "Cancel"]);
+  }
+
+  return actions.length === 0
+    ? detailButton
+    : `${detailButton}${actions.map(([action, label]) => `<button class="button secondary table-action" type="button" data-op-action="${action}" data-op-id="${escapeHtml(operation.id)}">${label}</button>`).join("")}`;
+}
+
+async function toggleOperationDetails(operationId, button) {
+  const row = document.getElementById(`operation-detail-${operationId}`);
+  if (!row) {
+    return;
+  }
+
+  if (!row.hidden) {
+    row.hidden = true;
+    button.textContent = "Details";
+    return;
+  }
+
+  row.hidden = false;
+  button.textContent = "Hide";
+  const target = row.querySelector(".operation-detail");
+  if (target.dataset.loaded === "true") {
+    return;
+  }
+
+  target.innerHTML = `<span class="muted-text">Loading operation details...</span>`;
   try {
-    await request(`/api/v1/operations/${operationId}/confirm`, { method: "POST" });
-    notice("Operation confirmed and inventory updated.", "success");
-    await loadOperations();
+    const detail = await request(`/api/v1/operations/${operationId}`);
+    target.innerHTML = renderOperationDetail(detail);
+    target.dataset.loaded = "true";
+  } catch (exception) {
+    target.innerHTML = `<span class="muted-text">${escapeHtml(getFriendlyWorkspaceError(exception))}</span>`;
+  }
+}
+
+function renderOperationDetail(detail) {
+  const lines = detail.lines || [];
+  const versions = detail.versions || [];
+  return `
+    <div class="operation-detail-grid">
+      <div class="metric"><span>Operation code</span><strong>${escapeHtml(detail.operationNumber)}</strong></div>
+      <div class="metric"><span>Created</span><strong>${escapeHtml(formatDateTime(detail.createdAt))}</strong></div>
+      <div class="metric"><span>Confirmed</span><strong>${escapeHtml(formatDateTime(detail.confirmedAt) || "-")}</strong></div>
+      <div class="metric"><span>Route</span><strong>${escapeHtml(formatOperationRoute(detail))}</strong></div>
+    </div>
+    ${detail.notes ? `<p class="muted-text">${escapeHtml(detail.notes)}</p>` : ""}
+    <div class="table-wrap compact-table"><table><thead><tr><th>SKU</th><th>Product</th><th>Packs</th><th>Lot</th><th>Batch expiry</th><th>Notes</th></tr></thead><tbody>${lines.length === 0
+      ? `<tr><td colspan="6">No lines.</td></tr>`
+      : lines.map((line) => `<tr>
+          <td><strong>${escapeHtml(line.skuCode)}</strong></td>
+          <td>${escapeHtml(line.productName)}</td>
+          <td>${escapeHtml(line.packQuantity)}</td>
+          <td>${escapeHtml(line.lotNumber || "-")}</td>
+          <td>${line.expiryDate ? expiryBadge(line.expiryDate) : `<span class="status-pill status-muted">-</span>`}</td>
+          <td>${escapeHtml(line.notes || "-")}</td>
+        </tr>`).join("")}</tbody></table></div>
+    <div class="operation-version-list">${versions.length === 0
+      ? `<span class="muted-text">No versions.</span>`
+      : versions.map((version) => `<span class="status-pill status-muted">v${escapeHtml(version.versionNumber)} ${escapeHtml(version.reason)} · ${escapeHtml(formatDateTime(version.editedAt))}</span>`).join("")}</div>`;
+}
+
+function operationStatusClass(status) {
+  if (status === "Received") {
+    return "status-ok";
+  }
+  if (status === "Cancelled") {
+    return "status-muted";
+  }
+  if (status === "Reserved" || status === "Shipped") {
+    return "status-warn";
+  }
+  return "status-muted";
+}
+
+function formatOperationRoute(operation) {
+  if (operation.operationType === "InventoryReceipt") {
+    return `External -> ${operation.destinationLocationName || "MainWarehouse"}`;
+  }
+  return `${operation.sourceLocationName || "MainWarehouse"} -> ${operation.destinationLocationName || "-"}`;
+}
+
+async function runOperationAction(action, operationId, button) {
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Working";
+  }
+
+  try {
+    await request(`/api/v1/operations/${operationId}/${action}`, { method: "POST" });
+    notice(`Operation ${action} completed.`, "success");
+    await Promise.all([
+      loadOperations(),
+      currentPath() === "/inventory" ? refreshInventoryTables() : Promise.resolve()
+    ]);
   } catch (exception) {
     notice(getFriendlyWorkspaceError(exception), "error");
+    await loadOperations();
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
   }
 }
 
@@ -1957,6 +2219,10 @@ function getFriendlyCatalogWriteError(exception) {
 }
 
 function getFriendlyInventoryError(exception) {
+  const problem = parseProblemDetails(exception);
+  if (problem) {
+    return problem;
+  }
   const status = exception?.status;
   if (status === 401) {
     return "Session expired. Sign in again.";
@@ -1971,14 +2237,9 @@ function getFriendlyInventoryError(exception) {
 }
 
 function getFriendlyWorkspaceError(exception) {
-  const message = exception instanceof Error ? exception.message : "";
-  if (message.includes("errors")) {
-    try {
-      const body = JSON.parse(message);
-      return Object.values(body.errors || {}).flat().join(" ") || "Check the form values.";
-    } catch {
-      return "Check the form values.";
-    }
+  const problem = parseProblemDetails(exception);
+  if (problem) {
+    return problem;
   }
   if (exception?.status === 401) {
     return "Session expired. Sign in again.";
@@ -1990,6 +2251,24 @@ function getFriendlyWorkspaceError(exception) {
     return "Check the request values.";
   }
   return "The workspace request failed.";
+}
+
+function parseProblemDetails(exception) {
+  const message = exception instanceof Error ? exception.message : "";
+  if (!message || !(message.includes("{") || message.includes("["))) {
+    return "";
+  }
+
+  try {
+    const body = JSON.parse(message);
+    const errors = Object.values(body.errors || {}).flat().filter(Boolean);
+    if (errors.length > 0) {
+      return errors.join(" ");
+    }
+    return body.detail || body.title || "";
+  } catch {
+    return "";
+  }
 }
 
 function debounce(callback, delay) {

@@ -83,6 +83,121 @@ public sealed class StockLedgerServiceTests
     }
 
     [Fact]
+    public async Task ReserveInWarehouseFefoAsync_ReservesPacksAndKeepsBatchesUntilCommitted()
+    {
+        await using var dbContext = CreateContext();
+        var service = new StockLedgerService(dbContext, new FixedClock());
+        var locationId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var late = await service.ReceiveAsync(locationId, skuId, 4, userId, "LATE", new DateOnly(2029, 1, 1));
+        var early = await service.ReceiveAsync(locationId, skuId, 3, userId, "EARLY", new DateOnly(2028, 1, 1));
+
+        var allocations = await service.ReserveInWarehouseFefoAsync(locationId, skuId, 5, userId);
+
+        var balance = await dbContext.StockBalances.SingleAsync();
+        Assert.Equal(new[] { early.Id, late.Id }, allocations.Select(value => value.BatchId));
+        Assert.Equal(new[] { 3, 2 }, allocations.Select(value => value.Quantity));
+        Assert.Equal(2, balance.AvailableQty);
+        Assert.Equal(5, balance.ReservedInWarehouseQty);
+        Assert.Equal(3, (await dbContext.InventoryBatches.SingleAsync(batch => batch.Id == early.Id)).Quantity);
+        Assert.Equal(4, (await dbContext.InventoryBatches.SingleAsync(batch => batch.Id == late.Id)).Quantity);
+    }
+
+    [Fact]
+    public async Task ReserveInWarehouseFefoAsync_SkipsBatchesBeforeMinimumExpiryDate()
+    {
+        await using var dbContext = CreateContext();
+        var service = new StockLedgerService(dbContext, new FixedClock());
+        var locationId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var shortDated = await service.ReceiveAsync(locationId, skuId, 4, userId, "SHORT", new DateOnly(2026, 9, 1));
+        var valid = await service.ReceiveAsync(locationId, skuId, 5, userId, "VALID", new DateOnly(2027, 1, 1));
+
+        var allocations = await service.ReserveInWarehouseFefoAsync(locationId, skuId, 3, userId, minimumExpiryDate: new DateOnly(2026, 12, 25));
+
+        Assert.Equal(valid.Id, Assert.Single(allocations).BatchId);
+        Assert.Equal(3, allocations[0].Quantity);
+        Assert.Equal(4, (await dbContext.InventoryBatches.SingleAsync(batch => batch.Id == shortDated.Id)).Quantity);
+        Assert.Equal(5, (await dbContext.InventoryBatches.SingleAsync(batch => batch.Id == valid.Id)).Quantity);
+    }
+
+    [Fact]
+    public async Task PlanReserveInWarehouseFefoAsync_DoesNotMutateStock()
+    {
+        await using var dbContext = CreateContext();
+        var service = new StockLedgerService(dbContext, new FixedClock());
+        var locationId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        await service.ReceiveAsync(locationId, skuId, 5, userId, "VALID", new DateOnly(2028, 6, 1));
+
+        var allocations = await service.PlanReserveInWarehouseFefoAsync(locationId, skuId, 3, minimumExpiryDate: new DateOnly(2027, 1, 1));
+
+        var balance = await dbContext.StockBalances.SingleAsync();
+        var batch = await dbContext.InventoryBatches.SingleAsync();
+        Assert.Equal(3, Assert.Single(allocations).Quantity);
+        Assert.Equal(5, balance.AvailableQty);
+        Assert.Equal(0, balance.ReservedInWarehouseQty);
+        Assert.Equal(5, batch.Quantity);
+        Assert.Single(await dbContext.StockTransactions.ToListAsync());
+    }
+
+
+    [Fact]
+    public async Task ReserveInWarehouseFefoAsync_RejectsWhenOnlyShortDatedBatchesExist()
+    {
+        await using var dbContext = CreateContext();
+        var service = new StockLedgerService(dbContext, new FixedClock());
+        var locationId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        await service.ReceiveAsync(locationId, skuId, 4, userId, "SHORT", new DateOnly(2026, 9, 1));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ReserveInWarehouseFefoAsync(locationId, skuId, 3, userId, minimumExpiryDate: new DateOnly(2026, 12, 25)));
+    }
+
+    [Fact]
+    public async Task CommitReservedInWarehouseOutAsync_DecreasesReservedStockAndAllocatedBatches()
+    {
+        await using var dbContext = CreateContext();
+        var service = new StockLedgerService(dbContext, new FixedClock());
+        var locationId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        await service.ReceiveAsync(locationId, skuId, 5, userId, "LOT", new DateOnly(2028, 6, 1));
+        var allocations = await service.ReserveInWarehouseFefoAsync(locationId, skuId, 4, userId);
+
+        await service.CommitReservedInWarehouseOutAsync(locationId, skuId, allocations, userId);
+
+        var balance = await dbContext.StockBalances.SingleAsync();
+        var transaction = await dbContext.StockTransactions.OrderBy(value => value.CreatedAt).LastAsync();
+        Assert.Equal(1, balance.AvailableQty);
+        Assert.Equal(0, balance.ReservedInWarehouseQty);
+        Assert.Equal(1, await dbContext.InventoryBatches.Select(batch => batch.Quantity).SingleAsync());
+        Assert.Equal(InventoryTransactionTypes.SupplyOut, transaction.TransactionType);
+        Assert.Equal(-4, transaction.QuantityChange);
+    }
+
+    [Fact]
+    public async Task ReceiveSupplyAsync_AppendsSupplyInTransaction()
+    {
+        await using var dbContext = CreateContext();
+        var service = new StockLedgerService(dbContext, new FixedClock());
+        var locationId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await service.ReceiveSupplyAsync(locationId, skuId, 6, userId, "TRANSFER", new DateOnly(2028, 6, 1));
+
+        var transaction = await dbContext.StockTransactions.SingleAsync();
+        Assert.Equal(InventoryTransactionTypes.SupplyIn, transaction.TransactionType);
+        Assert.Equal(6, transaction.QuantityChange);
+    }
+
+    [Fact]
     public async Task IssueFefoAsync_RejectsInvalidTransactionType()
     {
         await using var dbContext = CreateContext();

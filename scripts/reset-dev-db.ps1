@@ -66,6 +66,7 @@ if ($Schema) {
 
     $schemaSql = $match.Groups["sql"].Value
     $schemaSql | docker compose exec -T db psql -U lensee_user -d lensee
+    Get-Content -Raw -LiteralPath "database/schema-patch-operations-4b.sql" | docker compose exec -T db psql -U lensee_user -d lensee
 }
 
 if ($Seed) {

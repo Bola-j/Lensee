@@ -92,7 +92,7 @@ Acceptance tests must cover:
 - Sprint 3 is the stable checkpoint: Auth, Users, and Catalog are mapped in the API; Inventory has schema/entities but no public endpoints at the start of Sprint 4.
 - Sprint 4 is intentionally split into controlled gates:
   - Sprint 4A: Inventory foundation only.
-  - Sprint 4B: Operations foundation later.
+  - Sprint 4B: Operations foundation for MainWarehouse receipt and reserved warehouse transfer.
   - Sprint 4C: CRM links, alerts, and notifications later.
 - Catalog product expiry stores only the use-after-opening duration. Concrete sealed expiry remains on `inventory.inventory_batches.expiry_date`.
 - Inventory quantities are stored and moved as packs. Catalog `pieces_per_pack` is not used to expand inventory balances; it is used later by retail/online B2C sales when a warehouse sells individual pieces from an opened pack.
@@ -170,6 +170,76 @@ Make inventory a reliable core service that later Operations can depend on. By t
 - Public API does not allow arbitrary manual stock movement.
 - Target quantities support low-stock visibility without changing stock.
 - Sprint 4B Operations can call the ledger service without adding direct balance writes.
+
+## Sprint 4B - Operations Foundation: Main Receipt and Warehouse Transfer
+
+### Scope
+
+- Implement only two operation types:
+  - `InventoryReceipt`: external stock enters MainWarehouse only.
+  - `WarehouseTransfer`: stock moves from MainWarehouse to a non-main warehouse through a reserved shipment lifecycle.
+- Keep sales, CRM, payments, alerts, notifications, returns, and changes out of this sprint.
+- Keep the temporary Admin inventory receipt endpoint for development, but move the frontend receipt workflow to Operations.
+
+### Backend
+
+- Add `/api/v1/operations` endpoints for list, detail, create draft, update draft, confirm, ship, receive, and cancel.
+- Enforce operation lifecycle rules:
+  - `InventoryReceipt`: `Draft -> Received`, or `Draft -> Cancelled`.
+  - `WarehouseTransfer`: `Draft -> Reserved -> Shipped -> Received`, or cancel before received.
+- Enforce warehouse rules:
+  - external receipt destination must be MainWarehouse.
+  - transfer source must be MainWarehouse.
+  - transfer destination must not be MainWarehouse.
+  - sub, retail, and online warehouses receive stock only through `WarehouseTransfer`.
+- Confirming `InventoryReceipt` calls the inventory ledger and creates `Receipt` transactions.
+- Confirming `WarehouseTransfer` reserves packs at MainWarehouse and stores the FEFO allocation snapshot.
+- Shipping a transfer changes status only.
+- Receiving a transfer commits reserved MainWarehouse stock out with `SupplyOut`, creates destination batches with matching SKU, lot, expiry, and quantity, then posts `SupplyIn`.
+- Cancelling a reserved or shipped transfer releases the MainWarehouse reservation.
+- Stock-changing operation actions share a database transaction between Operations and Inventory where relational transactions are available.
+- Transfer reservation uses FEFO only among eligible batches:
+  - batches expiring before `today + product.opened_expiry_duration` are skipped.
+  - among eligible batches, earliest concrete batch expiry is still selected first.
+  - if only short-dated batches exist, the transfer confirm is rejected with a validation message.
+- Short-dated batches skipped by transfer FEFO are exposed by inventory as transfer-blocked stock for later sale/alert/write-off handling.
+- Add target-stock replenishment support for online/retail/sub warehouses:
+  - `target_qty` is the constant "meant to be available" pack count per warehouse/SKU.
+  - replenishment compares target packs against available packs plus already-reserved/shipped incoming transfers.
+  - Admin can manually reserve replenishment transfers from MainWarehouse now.
+  - daily reset replenishment reserves only stock above MainWarehouse's own target quantity.
+  - if MainWarehouse is already low or would become low by supplying a target reset, create a `TargetReplenishmentLowMainStock` alert for Admin and C-Level.
+  - replenishment preflights eligible FEFO stock before creating operations.
+  - the later scheduler should call the same replenishment path daily.
+- Database constraint updates for Sprint 4B live in `database/schema-patch-operations-4b.sql`; the startup compatibility helper is only a dev safety net.
+
+### Frontend
+
+- Add an Operations route for Admin, C-Level, Accountant, and WarehouseClerk.
+- Provide a focused 4B workspace:
+  - operation list and status badges
+  - create inventory receipt drafts
+  - create warehouse transfer drafts
+  - create multiple operation lines in one draft
+  - confirm, ship, receive, and cancel buttons based on current status
+  - pack quantities only
+- Hide mutation controls for C-Level and Accountant.
+- MainWarehouse is locked as the receipt destination and transfer source.
+- Transfer destination selection excludes MainWarehouse.
+- Inventory shows available, incoming, meant-to-be, and shortage quantities across non-main warehouses.
+- Inventory shows transfer-blocked short-expiry batches.
+- Admin can reserve replenishment shortages from the inventory workspace.
+
+### Acceptance
+
+- MainWarehouse receives external stock through `InventoryReceipt`.
+- Non-main warehouses receive stock only by `WarehouseTransfer`.
+- Reserved transfer stock remains reserved at MainWarehouse until destination receipt or cancellation.
+- Target-stock replenishment does not change destination stock until the reserved transfer is received.
+- Replenishment does not leave cancelled operation records for shortages that cannot be reserved from eligible MainWarehouse batches.
+- Inventory balances, batches, and stock transactions are mutated only through `StockLedgerService`.
+- `database/schema-patch-operations-4b.sql` is applied during dev reset and is the durable schema patch for operation type/status constraints.
+- Existing catalog and inventory flows remain stable.
 
 ## Sprint 5 - CRM, Representatives, and Return Eligibility
 

@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -82,15 +83,16 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddDbContext<IdentityDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<CatalogDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<InventoryDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<CrmDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<OperationsDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<PaymentsDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<NotificationsDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<SharedDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddScoped(_ => new NpgsqlConnection(connectionString));
+builder.Services.AddDbContext<IdentityDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
+builder.Services.AddDbContext<CatalogDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
+builder.Services.AddDbContext<InventoryDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
+builder.Services.AddDbContext<CrmDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
+builder.Services.AddDbContext<OperationsDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
+builder.Services.AddDbContext<PaymentsDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
+builder.Services.AddDbContext<NotificationsDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
+builder.Services.AddDbContext<ReportingDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
+builder.Services.AddDbContext<SharedDbContext>((services, options) => options.UseNpgsql(services.GetRequiredService<NpgsqlConnection>()));
 
 builder.Services.AddScoped<IClock, SystemClock>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
@@ -132,9 +134,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("catalog.write", policy => policy.RequireClaim("permission", LenseePermissions.CatalogWrite));
     options.AddPolicy("inventory.read", policy => policy.RequireClaim("permission", LenseePermissions.InventoryRead));
     options.AddPolicy("inventory.write", policy => policy.RequireRole(LenseeRoles.Admin).RequireClaim("permission", LenseePermissions.InventoryWrite));
+    options.AddPolicy("operations.read", policy => policy.RequireClaim("permission", LenseePermissions.OperationsRead));
+    options.AddPolicy("operations.write", policy => policy.RequireClaim("permission", LenseePermissions.OperationsWrite));
 });
 
 var app = builder.Build();
+
+await DatabaseCompatibility.EnsureDevelopmentSchemaAsync(app.Services, app.Environment);
 
 app.UseExceptionHandler(errorApp =>
 {
@@ -182,6 +188,7 @@ app.MapAuthEndpoints();
 app.MapUserEndpoints();
 app.MapCatalogEndpoints();
 app.MapInventoryEndpoints();
+app.MapOperationsEndpoints();
 
 app.Run();
 
